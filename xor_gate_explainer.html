@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XOR — from truth table to four NAND gates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E6E4DC;
+  --paper-2:#DEDCD2;
+  --ink:#16202B;
+  --ink-soft:#4A5560;
+  --rule:#A9AEA3;
+  --green:#2F6E5B;
+  --amber:#E0A21B;
+  --amber-dim:#8A6410;
+  --display:"Saira Condensed","Arial Narrow",sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono","SF Mono",Consolas,monospace;
+  --maxw:940px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--paper);
+  background-image:
+    linear-gradient(rgba(169,174,163,.16) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(169,174,163,.16) 1px,transparent 1px);
+  background-size:26px 26px;
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+/* ---------- masthead ---------- */
+.masthead{padding:72px 0 40px;border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:var(--mono);font-size:12px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--green);font-weight:600;margin:0 0 14px;
+}
+.masthead h1{
+  font-family:var(--display);font-weight:800;font-size:clamp(46px,9vw,104px);
+  line-height:.92;letter-spacing:-.015em;margin:0 0 18px;text-transform:uppercase;
+}
+.masthead h1 em{font-style:normal;color:var(--green)}
+.standfirst{font-size:20px;max-width:62ch;margin:0;color:var(--ink-soft)}
+
+/* ---------- sticky live bar ---------- */
+.bench{
+  position:sticky;top:0;z-index:50;
+  background:var(--ink);color:var(--paper);
+  border-bottom:2px solid var(--ink);
+}
+.bench-inner{
+  max-width:var(--maxw);margin:0 auto;padding:12px 24px;
+  display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+}
+.bench-label{
+  font-family:var(--mono);font-size:15px;letter-spacing:.01em;font-weight:500;
+  color:var(--paper);width:100%;margin:0 0 9px;
+}
+.sw{
+  display:flex;align-items:center;gap:9px;background:none;border:0;padding:0;
+  cursor:pointer;font-family:var(--display);color:var(--paper);
+}
+.sw .nm{font-size:26px;font-weight:700;line-height:1;width:14px;text-align:center}
+.sw .lamp{
+  width:52px;height:28px;border:2px solid var(--rule);border-radius:2px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:14px;font-weight:600;color:var(--rule);
+  transition:background .12s,color .12s,border-color .12s;
+}
+.sw[aria-pressed="true"] .lamp{background:var(--amber);border-color:var(--amber);color:var(--ink)}
+.sw:focus-visible{outline:2px solid var(--amber);outline-offset:4px}
+.bench-out{display:flex;align-items:center;gap:9px;padding-left:20px;border-left:1px solid #35414c}
+.bench-out .nm{font-family:var(--display);font-size:26px;font-weight:700}
+.stepper{
+  margin-left:auto;
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  background:none;color:var(--rule);border:1px solid #45515c;border-radius:2px;
+  padding:7px 11px;cursor:pointer;
+}
+.stepper:hover{color:var(--paper);border-color:var(--rule)}
+.stepper:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+
+/* ---------- sections ---------- */
+section{padding:56px 0;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:0}
+h2{
+  font-family:var(--display);font-weight:700;font-size:clamp(30px,4.6vw,46px);
+  line-height:1.02;letter-spacing:-.01em;margin:0 0 8px;text-transform:uppercase;
+}
+h3{
+  font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:.01em;
+  margin:36px 0 10px;text-transform:uppercase;
+}
+.kicker{
+  font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--green);font-weight:600;margin:0 0 12px;
+}
+p{max-width:70ch}
+a{color:var(--green)}
+
+/* ---------- boolean expressions ---------- */
+.expr{
+  font-family:var(--mono);font-size:clamp(15px,2.4vw,21px);font-weight:500;
+  background:var(--paper-2);border-left:4px solid var(--green);
+  padding:18px 20px;margin:22px 0;overflow-x:auto;white-space:nowrap;
+}
+.expr.lead{border-left-color:var(--amber)}
+.expr .cmt{color:var(--ink-soft);font-size:.8em}
+
+/* live value chips */
+.val{
+  display:inline-block;min-width:1.5em;text-align:center;
+  font-family:var(--mono);font-weight:600;
+  background:var(--rule);color:var(--ink);
+  border-radius:2px;padding:0 .28em;
+  transition:background .12s,color .12s;
+}
+.val.hi{background:var(--amber);color:var(--ink)}
+
+/* ---------- tables ---------- */
+.tbl-scroll{overflow-x:auto;margin:22px 0}
+table{border-collapse:collapse;font-family:var(--mono);font-size:15px;min-width:100%}
+caption{
+  caption-side:top;text-align:left;font-family:var(--mono);font-size:11px;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--green);
+  padding-bottom:9px;font-weight:600;
+}
+th,td{padding:9px 14px;text-align:center;border:1px solid var(--rule)}
+th{background:var(--ink);color:var(--paper);font-weight:600;font-size:12px;
+   letter-spacing:.09em;text-transform:uppercase}
+tbody tr.active td{background:var(--paper-2);box-shadow:inset 3px 0 0 var(--amber)}
+td.one{font-weight:600;background:rgba(224,162,27,.2)}
+td.lbl{text-align:left;font-family:var(--body);font-size:15px}
+th.lbl{text-align:left}
+
+/* ---------- schematics ---------- */
+figure{margin:30px 0}
+.sheet{
+  background:#F1EFE8;border:1px solid var(--rule);padding:14px;overflow-x:auto;
+}
+.sheet svg{display:block;min-width:560px;width:100%;height:auto}
+figcaption{
+  font-family:var(--mono);font-size:12px;color:var(--ink-soft);
+  margin-top:10px;line-height:1.5;
+}
+.wire{stroke:var(--rule);stroke-width:2.4;fill:none;stroke-linecap:square;transition:stroke .12s}
+.wire.hi{stroke:var(--amber);stroke-width:3}
+.jn{fill:var(--rule);transition:fill .12s}
+.jn.hi{fill:var(--amber)}
+.gate{fill:#F1EFE8;stroke:var(--ink);stroke-width:2.2}
+.pin{font-family:var(--mono);font-size:13px;font-weight:600;fill:var(--ink)}
+.pin.sm{font-size:11px;font-weight:400;fill:var(--ink-soft)}
+.gnum{font-family:var(--display);font-size:15px;font-weight:700;fill:var(--ink-soft)}
+.dip{fill:#DEDCD2;stroke:var(--ink);stroke-width:2.2}
+.leg{stroke:var(--ink);stroke-width:2.2}
+
+/* ---------- numbered derivation ---------- */
+.steps{list-style:none;counter-reset:s;margin:28px 0 0;padding:0}
+.steps>li{
+  counter-increment:s;position:relative;
+  padding:0 0 30px 74px;border-left:1px solid var(--rule);margin-left:22px;
+}
+.steps>li:last-child{border-left-color:transparent}
+.steps>li::before{
+  content:counter(s,decimal-leading-zero);
+  position:absolute;left:-22px;top:-4px;
+  font-family:var(--display);font-weight:800;font-size:19px;
+  background:var(--green);color:var(--paper);
+  width:44px;height:30px;display:flex;align-items:center;justify-content:center;
+}
+.steps h3{margin-top:0}
+
+/* ---------- callout ---------- */
+.note{
+  border:1px solid var(--ink);background:var(--paper-2);
+  padding:20px 22px;margin:26px 0;
+}
+.note .kicker{margin-bottom:8px}
+.note p:last-child{margin-bottom:0}
+
+/* ---------- kmap ---------- */
+.kmap{border-collapse:collapse;font-family:var(--mono);min-width:0;width:auto}
+.kmap td,.kmap th{width:56px;height:52px;font-size:18px}
+.kmap .hdr{background:none;color:var(--ink-soft);border:0;font-size:12px}
+
+/* ---------- checklist ---------- */
+.check{list-style:none;padding:0;margin:22px 0}
+.check li{
+  padding:11px 0 11px 34px;border-bottom:1px dotted var(--rule);position:relative;
+  max-width:70ch;
+}
+.check li::before{
+  content:"";position:absolute;left:2px;top:17px;
+  width:13px;height:13px;border:2px solid var(--green);
+}
+
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0 40px}
+footer{padding:40px 0 70px;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+code{font-family:var(--mono);font-size:.92em;background:var(--paper-2);padding:1px 5px}
+
+@media (max-width:640px){
+  body{font-size:16px}
+  .bench-label{font-size:13px;margin-bottom:8px}
+  .bench-out{padding-left:0;border-left:0}
+  .steps>li{padding-left:20px;margin-left:20px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= LIVE BENCH ======================= -->
+<div class="bench">
+  <div class="bench-inner">
+    <span class="bench-label">Set A and B — every table, expression and schematic below follows</span>
+    <button class="sw" id="swA" aria-pressed="false"><span class="nm">A</span><span class="lamp">0</span></button>
+    <button class="sw" id="swB" aria-pressed="false"><span class="nm">B</span><span class="lamp">0</span></button>
+    <span class="bench-out"><span class="nm">X</span><span class="val" data-sig="x">0</span></span>
+    <button class="stepper" id="cycle">Step through all four rows</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Digital logic · combinational circuits</p>
+  <h1>Exclusive <em>OR</em></h1>
+  <p class="standfirst">One function, five ways to build it — and the reason a single 14-pin
+  package of NAND gates has exactly enough gates to do the job with nothing left over.</p>
+</header>
+
+<!-- ======================= 1. WHAT IT IS ======================= -->
+<section id="what">
+  <p class="kicker">The function</p>
+  <h2>A difference detector</h2>
+  <p>Plain OR asks: <em>is at least one input high?</em> Exclusive OR asks a sharper question:
+  <em>are the two inputs different?</em> It goes high when exactly one input is high, and low
+  when the inputs agree — whether they agree on 0 or on 1.</p>
+
+  <p>That reading is worth holding onto, because it explains almost every place XOR shows up
+  later. A parity checker is asking whether a bit pattern differs from even. A subtractor is
+  asking where two numbers disagree. A comparator is asking whether two words match. All of
+  them are difference detectors.</p>
+
+  <p>The usual symbol is <code>⊕</code>, so the function is written <code>A ⊕ B</code>. In the
+  C-style notation used on this page, <code>&amp;</code> is AND, <code>|</code> is OR, and
+  <code>~</code> is NOT.</p>
+
+  <div class="tbl-scroll">
+  <table id="tt-main">
+    <caption>Truth table — the active row follows the switches above</caption>
+    <thead>
+      <tr><th>A</th><th>B</th><th>A ⊕ B</th><th class="lbl">In words</th></tr>
+    </thead>
+    <tbody>
+      <tr data-row="0"><td>0</td><td>0</td><td>0</td><td class="lbl">Inputs agree — low</td></tr>
+      <tr data-row="1"><td>0</td><td>1</td><td class="one">1</td><td class="lbl">Inputs differ</td></tr>
+      <tr data-row="2"><td>1</td><td>0</td><td class="one">1</td><td class="lbl">Inputs differ</td></tr>
+      <tr data-row="3"><td>1</td><td>1</td><td>0</td><td class="lbl">Inputs agree — high</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p class="kicker">Why it isn't a primitive</p>
+    <p>AND, OR, and NOT are the three operations Boolean algebra is built from. XOR is not one of
+    them — it is a function you assemble. Every construction below is an answer to the same
+    question: which arrangement of the three primitives reproduces that column of outputs?</p>
+  </div>
+</section>
+
+<!-- ======================= 2. FACTORED FORM ======================= -->
+<section id="factored">
+  <p class="kicker">Construction one · from behaviour</p>
+  <h2>At least one, but not both</h2>
+  <p>Start from the description rather than the table. "At least one input is high" is
+  <code>A | B</code>. "Not both are high" is <code>~(A &amp; B)</code>. XOR wants both
+  conditions at once, so AND them together:</p>
+
+  <div class="expr lead">
+    X = ( ~( A &amp; B ) ) &amp; ( A | B )
+    &nbsp;&nbsp;→&nbsp;&nbsp;
+    ( ~( <span class="val" data-sig="a">0</span> &amp; <span class="val" data-sig="b">0</span> ) ) &amp; ( <span class="val" data-sig="a">0</span> | <span class="val" data-sig="b">0</span> )
+    = ( <span class="val" data-sig="n">1</span> ) &amp; ( <span class="val" data-sig="or">0</span> )
+    = <span class="val" data-sig="x">0</span>
+  </div>
+
+  <p>Verifying it row by row is the whole proof. The AND column and the OR column are never both
+  favourable except in the two middle rows:</p>
+
+  <div class="tbl-scroll">
+  <table id="tt-fact">
+    <caption>Verification of the factored form</caption>
+    <thead>
+      <tr><th>A</th><th>B</th><th>A &amp; B</th><th>~(A &amp; B)</th><th>A | B</th><th>X</th></tr>
+    </thead>
+    <tbody>
+      <tr data-row="0"><td>0</td><td>0</td><td>0</td><td class="one">1</td><td>0</td><td>0</td></tr>
+      <tr data-row="1"><td>0</td><td>1</td><td>0</td><td class="one">1</td><td class="one">1</td><td class="one">1</td></tr>
+      <tr data-row="2"><td>1</td><td>0</td><td>0</td><td class="one">1</td><td class="one">1</td><td class="one">1</td></tr>
+      <tr data-row="3"><td>1</td><td>1</td><td class="one">1</td><td>0</td><td class="one">1</td><td>0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure>
+    <div class="sheet">
+      <svg viewBox="0 0 620 260" role="img" aria-label="Schematic: AND feeding an inverter, an OR gate, and a final AND gate">
+        <defs>
+          <g id="andg">
+            <path class="gate" d="M0,0 h22 a18,18 0 0 1 0,36 h-22 z"/>
+          </g>
+          <g id="org">
+            <path class="gate" d="M0,0 c13,2 27,9 40,18 c-13,9 -27,16 -40,18 c7,-12 7,-24 0,-36 z"/>
+          </g>
+          <g id="notg">
+            <path class="gate" d="M0,0 l36,18 l-36,18 z"/>
+            <circle class="gate" cx="40" cy="18" r="4"/>
+          </g>
+        </defs>
+
+        <!-- input rails -->
+        <path class="wire" data-sig="a" d="M40,52 H170"/>
+        <path class="wire" data-sig="a" d="M100,52 V192 H170"/>
+        <path class="wire" data-sig="b" d="M40,208 H170"/>
+        <path class="wire" data-sig="b" d="M120,208 V68 H170"/>
+        <circle class="jn" data-sig="a" cx="100" cy="52" r="4"/>
+        <circle class="jn" data-sig="b" cx="120" cy="208" r="4"/>
+        <text class="pin" x="20" y="57">A</text>
+        <text class="pin" x="20" y="213">B</text>
+
+        <!-- AND1 -->
+        <use href="#andg" x="170" y="42"/>
+        <path class="wire" data-sig="and" d="M210,60 H250"/>
+        <text class="pin sm" x="216" y="52">A&amp;B</text>
+
+        <!-- NOT -->
+        <use href="#notg" x="250" y="42"/>
+        <path class="wire" data-sig="n" d="M294,60 H360 V122 H400"/>
+        <text class="pin sm" x="304" y="52">~(A&amp;B)</text>
+
+        <!-- OR -->
+        <use href="#org" x="170" y="182"/>
+        <path class="wire" data-sig="or" d="M210,200 H370 V138 H400"/>
+        <text class="pin sm" x="222" y="192">A|B</text>
+
+        <!-- AND2 -->
+        <use href="#andg" x="400" y="112"/>
+        <path class="wire" data-sig="x" d="M440,130 H520"/>
+        <text class="pin" x="530" y="135">X</text>
+      </svg>
+    </div>
+    <figcaption>Four gates: AND, NOT, OR, AND. Wires that cross without a solid dot are not
+    connected. Amber = logic HIGH, grey = logic LOW.</figcaption>
+  </figure>
+
+  <div class="note">
+    <p class="kicker">A useful accident</p>
+    <p>The intermediate signal <code>A &amp; B</code> in this circuit is exactly the carry-out of a
+    half adder. Build XOR this way and the carry bit is already sitting on a node, free. That is
+    not a coincidence — a half adder <em>is</em> an XOR and an AND sharing the same two inputs,
+    and this construction happens to share the AND rather than duplicating it.</p>
+  </div>
+</section>
+
+<!-- ======================= 3. SOP ======================= -->
+<section id="sop">
+  <p class="kicker">Construction two · from the table</p>
+  <h2>Sum of products</h2>
+  <p>The second route ignores any clever reading of the function and works mechanically from the
+  truth table. Find every row whose output is 1. Write one product term per row — a term that is
+  true for that row and false everywhere else. Then OR the terms together.</p>
+
+  <div class="cols">
+    <div>
+      <h3>Row A=0, B=1</h3>
+      <p>True only when A is low and B is high: <code>(~A) &amp; B</code>.</p>
+    </div>
+    <div>
+      <h3>Row A=1, B=0</h3>
+      <p>True only when A is high and B is low: <code>A &amp; (~B)</code>.</p>
+    </div>
+  </div>
+
+  <div class="expr">
+    X = ( ~A &amp; B ) | ( A &amp; ~B )
+    &nbsp;&nbsp;→&nbsp;&nbsp;
+    ( <span class="val" data-sig="na">1</span> &amp; <span class="val" data-sig="b">0</span> ) | ( <span class="val" data-sig="a">0</span> &amp; <span class="val" data-sig="nb">1</span> )
+    = <span class="val" data-sig="t1">0</span> | <span class="val" data-sig="t2">0</span>
+    = <span class="val" data-sig="x">0</span>
+  </div>
+
+  <p>These single-row terms are called <strong>minterms</strong>, and the recipe is completely
+  general: any truth table you can write down, with any number of inputs, converts to a
+  sum-of-products expression this way. That generality is the real payoff. The factored form
+  above required an insight about what XOR means; this one required only the ability to read a
+  table.</p>
+
+  <div class="tbl-scroll">
+  <table id="tt-sop">
+    <caption>Each minterm covers exactly one row</caption>
+    <thead>
+      <tr><th>A</th><th>B</th><th>~A &amp; B</th><th>A &amp; ~B</th><th>OR of the two</th></tr>
+    </thead>
+    <tbody>
+      <tr data-row="0"><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr data-row="1"><td>0</td><td>1</td><td class="one">1</td><td>0</td><td class="one">1</td></tr>
+      <tr data-row="2"><td>1</td><td>0</td><td>0</td><td class="one">1</td><td class="one">1</td></tr>
+      <tr data-row="3"><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure>
+    <div class="sheet">
+      <svg viewBox="0 0 700 300" role="img" aria-label="Schematic: two inverters, two AND gates, and an OR gate">
+        <path class="wire" data-sig="a" d="M36,40 H200 V94 Q208,100 200,106 V194 H300"/>
+        <path class="wire" data-sig="b" d="M36,260 H230 V216 Q238,210 230,204 V200 Q238,194 230,188 V116 H300"/>
+        <text class="pin" x="16" y="45">A</text>
+        <text class="pin" x="16" y="265">B</text>
+        <path class="wire" data-sig="a" d="M90,40 V100 H140"/>
+        <circle class="jn" data-sig="a" cx="90" cy="40" r="4"/>
+        <path class="wire" data-sig="b" d="M90,260 V210 H140"/>
+        <circle class="jn" data-sig="b" cx="90" cy="260" r="4"/>
+
+        <use href="#notg" x="140" y="82"/>
+        <path class="wire" data-sig="na" d="M184,100 H300"/>
+        <text class="pin sm" x="252" y="92">~A</text>
+
+        <use href="#notg" x="140" y="192"/>
+        <path class="wire" data-sig="nb" d="M184,210 H300"/>
+        <text class="pin sm" x="252" y="202">~B</text>
+
+        <use href="#andg" x="300" y="90"/>
+        <path class="wire" data-sig="t1" d="M340,108 H400 V152 H450"/>
+
+        <use href="#andg" x="300" y="184"/>
+        <path class="wire" data-sig="t2" d="M340,202 H420 V168 H450"/>
+
+        <use href="#org" x="450" y="142"/>
+        <path class="wire" data-sig="x" d="M490,160 H600"/>
+        <text class="pin" x="612" y="165">X</text>
+      </svg>
+    </div>
+    <figcaption>Five gates: two inverters, two ANDs, one OR. One more package pin's worth of
+    silicon than the factored version, for the same function. The small bumps mark wires that
+    cross without connecting.</figcaption>
+  </figure>
+
+  <h3>Why the K-map can't help</h3>
+  <p>The usual next move after writing a sum of products is to minimise it with a Karnaugh map,
+  grouping adjacent 1s. XOR is the standard example where that fails. Its two 1s sit on the
+  diagonal, and diagonal cells are not adjacent — they differ in both variables, not one.
+  No grouping is possible, so the canonical form is already minimal <em>as a sum of products</em>.</p>
+
+  <div class="tbl-scroll">
+  <table class="kmap">
+    <caption>Two-variable K-map for A ⊕ B</caption>
+    <tr><td class="hdr"></td><th class="hdr">B=0</th><th class="hdr">B=1</th></tr>
+    <tr><th class="hdr">A=0</th><td>0</td><td class="one">1</td></tr>
+    <tr><th class="hdr">A=1</th><td class="one">1</td><td>0</td></tr>
+  </table>
+  </div>
+
+  <p>The lesson generalises. Any function whose 1s form a checkerboard resists sum-of-products
+  minimisation, and XOR-heavy logic — parity trees, adders, CRC generators — is exactly where
+  K-maps stop being the right tool. The gain has to come from factoring instead, which is what
+  the first construction did.</p>
+
+  <div class="note">
+    <p class="kicker">Small observation</p>
+    <p>The two minterms are mutually exclusive — never both 1 at the same time. So the OR joining
+    them could be replaced by an XOR without changing the output. True, but circular if you are
+    trying to build XOR in the first place. It matters in a different setting: when terms are
+    provably disjoint, a designer is free to use whichever combining gate is cheaper in the
+    target technology.</p>
+  </div>
+</section>
+
+<!-- ======================= 4. EQUIVALENCE ======================= -->
+<section id="equiv">
+  <p class="kicker">Reconciling the two</p>
+  <h2>The same circuit, twice</h2>
+  <p>Two expressions that produce identical truth tables are the same Boolean function, so the
+  row-by-row checks above already prove equivalence. But the algebra is short, and it shows
+  <em>how</em> one becomes the other rather than merely that it does.</p>
+
+  <div class="expr">
+X = ~(A &amp; B) &amp; (A | B)<br>
+&nbsp;&nbsp;= (~A | ~B) &amp; (A | B)&nbsp;&nbsp;<span class="cmt">De Morgan on the first factor</span><br>
+&nbsp;&nbsp;= (~A &amp; A) | (~A &amp; B) | (~B &amp; A) | (~B &amp; B)&nbsp;&nbsp;<span class="cmt">expand</span><br>
+&nbsp;&nbsp;= 0 | (~A &amp; B) | (A &amp; ~B) | 0&nbsp;&nbsp;<span class="cmt">complement law</span><br>
+&nbsp;&nbsp;= (~A &amp; B) | (A &amp; ~B)
+  </div>
+
+  <p>Two of the four expanded terms die immediately, because a variable ANDed with its own
+  complement is always 0. What survives is precisely the sum of products. So the factored form
+  is the sum of products with the common structure pulled back out — the two are related the way
+  <code>x² − y²</code> and <code>(x+y)(x−y)</code> are related in ordinary algebra.</p>
+
+  <div class="tbl-scroll">
+  <table>
+    <caption>Cost of each construction, counting two-input gates</caption>
+    <thead>
+      <tr><th class="lbl">Form</th><th>Gates</th><th>Gate types</th><th>Max depth</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="lbl">~(A&amp;B) &amp; (A|B)</td><td>4</td><td>AND, NOT, OR, AND</td><td>3</td></tr>
+      <tr><td class="lbl">~A&amp;B | A&amp;~B</td><td>5</td><td>NOT×2, AND×2, OR</td><td>3</td></tr>
+      <tr><td class="lbl">NAND only</td><td>4</td><td>NAND×4</td><td>3</td></tr>
+      <tr><td class="lbl">NOR only</td><td>5</td><td>NOR×5</td><td>4</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>"Depth" is the longest chain of gates a signal passes through, and it sets the propagation
+  delay. Both three-gate-deep versions settle in about the same time; the NAND version wins on
+  parts, not on speed.</p>
+</section>
+
+<!-- ======================= 5. NAND REDUCTION ======================= -->
+<section id="nand">
+  <p class="kicker">Construction three · one gate type</p>
+  <h2>Down to four NANDs</h2>
+  <p>The factored form is already most of the way to a NAND-only circuit, because its first
+  operation <em>is</em> a NAND. The following four steps carry it the rest of the way. The order
+  matters — each line is the input to the next.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Name the NAND you already have</h3>
+      <p>Let <code>N = ~(A &amp; B)</code>. That is one NAND gate, taking the two inputs directly.
+      The expression becomes <code>X = N &amp; (A | B)</code>.</p>
+      <div class="expr">N = ~( <span class="val" data-sig="a">0</span> &amp; <span class="val" data-sig="b">0</span> ) = <span class="val" data-sig="n">1</span></div>
+    </li>
+    <li>
+      <h3>Distribute N across the OR</h3>
+      <p>AND distributes over OR exactly as multiplication distributes over addition:</p>
+      <div class="expr">X = N &amp; (A | B) = (N &amp; A) | (N &amp; B)</div>
+      <p>This deliberately makes the expression longer. The point is that both new terms are
+      ANDs, and ANDs are one inversion away from NANDs.</p>
+    </li>
+    <li>
+      <h3>Convert the OR with De Morgan</h3>
+      <p>Using <code>P | Q = ~( ~P &amp; ~Q )</code> with <code>P = N&amp;A</code> and
+      <code>Q = N&amp;B</code>:</p>
+      <div class="expr">X = ~( ~(N &amp; A) &amp; ~(N &amp; B) )</div>
+      <p>Every operation left in the expression is a NAND. There is nothing further to convert.</p>
+    </li>
+    <li>
+      <h3>Read it as hardware</h3>
+      <p>Three <code>~( … &amp; … )</code> patterns are visible, plus the one hiding inside N:</p>
+      <div class="expr lead">
+        N = ~(A &amp; B) = <span class="val" data-sig="n">1</span> &nbsp;·&nbsp;
+        P = ~(N &amp; A) = <span class="val" data-sig="p">1</span> &nbsp;·&nbsp;
+        Q = ~(N &amp; B) = <span class="val" data-sig="q">1</span> &nbsp;·&nbsp;
+        X = ~(P &amp; Q) = <span class="val" data-sig="x">0</span>
+      </div>
+      <p>Four NAND gates, and the wiring falls out of the four definitions with no further
+      thought.</p>
+    </li>
+  </ol>
+
+  <figure>
+    <div class="sheet">
+      <svg viewBox="0 0 700 340" role="img" aria-label="Schematic: four NAND gates wired as an exclusive OR">
+        <defs>
+          <g id="nandg">
+            <path class="gate" d="M0,0 h22 a18,18 0 0 1 0,36 h-22 z"/>
+            <circle class="gate" cx="44" cy="18" r="4"/>
+          </g>
+        </defs>
+
+        <!-- A and B rails -->
+        <path class="wire" data-sig="a" d="M40,62 H330"/>
+        <path class="wire" data-sig="a" d="M100,62 V162 H140"/>
+        <circle class="jn" data-sig="a" cx="100" cy="62" r="4"/>
+        <path class="wire" data-sig="b" d="M40,278 H330"/>
+        <path class="wire" data-sig="b" d="M80,278 V178 H140"/>
+        <circle class="jn" data-sig="b" cx="80" cy="278" r="4"/>
+        <text class="pin" x="20" y="67">A</text>
+        <text class="pin" x="20" y="283">B</text>
+
+        <!-- G1 -->
+        <use href="#nandg" x="140" y="152"/>
+        <text class="gnum" x="152" y="176">1</text>
+        <path class="wire" data-sig="n" d="M188,170 H240"/>
+        <path class="wire" data-sig="n" d="M240,170 V78 H330"/>
+        <path class="wire" data-sig="n" d="M240,170 V262 H330"/>
+        <circle class="jn" data-sig="n" cx="240" cy="170" r="4"/>
+        <text class="pin sm" x="248" y="163">N</text>
+
+        <!-- G2 -->
+        <use href="#nandg" x="330" y="52"/>
+        <text class="gnum" x="342" y="76">2</text>
+        <path class="wire" data-sig="p" d="M378,70 H445 V162 H520"/>
+        <text class="pin sm" x="388" y="62">P</text>
+
+        <!-- G3 -->
+        <use href="#nandg" x="330" y="252"/>
+        <text class="gnum" x="342" y="276">3</text>
+        <path class="wire" data-sig="q" d="M378,270 H460 V178 H520"/>
+        <text class="pin sm" x="388" y="262">Q</text>
+
+        <!-- G4 -->
+        <use href="#nandg" x="520" y="152"/>
+        <text class="gnum" x="532" y="176">4</text>
+        <path class="wire" data-sig="x" d="M568,170 H645"/>
+        <text class="pin" x="655" y="175">X</text>
+      </svg>
+    </div>
+    <figcaption>Gate 1 takes A and B. Gate 2 takes N and A. Gate 3 takes N and B. Gate 4 takes P
+    and Q. The node marked N fans out to two gates — that shared signal is what keeps the count
+    at four.</figcaption>
+  </figure>
+
+  <div class="tbl-scroll">
+  <table id="tt-nand">
+    <caption>Node-by-node behaviour of the four-NAND circuit</caption>
+    <thead>
+      <tr><th>A</th><th>B</th><th>N = ~(A&amp;B)</th><th>P = ~(N&amp;A)</th><th>Q = ~(N&amp;B)</th><th>X = ~(P&amp;Q)</th></tr>
+    </thead>
+    <tbody>
+      <tr data-row="0"><td>0</td><td>0</td><td class="one">1</td><td class="one">1</td><td class="one">1</td><td>0</td></tr>
+      <tr data-row="1"><td>0</td><td>1</td><td class="one">1</td><td class="one">1</td><td>0</td><td class="one">1</td></tr>
+      <tr data-row="2"><td>1</td><td>0</td><td class="one">1</td><td>0</td><td class="one">1</td><td class="one">1</td></tr>
+      <tr data-row="3"><td>1</td><td>1</td><td>0</td><td class="one">1</td><td class="one">1</td><td>0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The bottom row is the one worth checking by hand, because it is where the circuit does its
+  least obvious work. With both inputs high, N goes low. A low input to a NAND forces its output
+  high regardless of the other input, so P and Q are both driven high, and gate 4 pulls X low.
+  Both-high gives low, as XOR requires.</p>
+
+  <h3>Timing</h3>
+  <p>Signals reach gate 4 by two different routes. A travels through gate 2 in one gate delay,
+  but it also travels through gate 1 and <em>then</em> gate 2, taking two. The longest path is
+  three gates deep, so the output is not trustworthy until three propagation delays after an
+  input changes. For 74LS parts that is roughly 30 ns; a dedicated 74LS86 XOR settles in about a
+  third of that. Check the datasheet for the family actually on the bench — delays vary by an
+  order of magnitude between LS, HC, and HCT.</p>
+
+  <p>In the interval before things settle, the output can briefly show a wrong value — a glitch,
+  or <em>static hazard</em>. It is harmless when the output feeds a clocked flip-flop that samples
+  later, and a genuine bug when it feeds something asynchronous. Worth putting on a scope.</p>
+</section>
+
+<!-- ======================= 6. BUILD IT ======================= -->
+<section id="build">
+  <p class="kicker">On the bench</p>
+  <h2>One 7400, no leftovers</h2>
+  <p>The 7400 is a quad two-input NAND: four independent gates in a 14-pin DIP. The XOR needs
+  exactly four. That tidiness is why this circuit turns up in every introductory lab.</p>
+
+  <figure>
+    <div class="sheet">
+      <svg viewBox="0 0 620 390" role="img" aria-label="Pin assignment diagram for a 7400 wired as an exclusive OR">
+        <path class="dip" d="M215,40 H285 A15,15 0 0 0 315,40 H385 V340 H215 Z"/>
+        <text class="pin" x="248" y="196" font-size="19" font-weight="600">7400</text>
+
+        <!-- left pins 1-7 -->
+        <line class="leg" x1="185" y1="70"  x2="215" y2="70"/>
+        <line class="leg" x1="185" y1="110" x2="215" y2="110"/>
+        <line class="leg" x1="185" y1="150" x2="215" y2="150"/>
+        <line class="leg" x1="185" y1="190" x2="215" y2="190"/>
+        <line class="leg" x1="185" y1="230" x2="215" y2="230"/>
+        <line class="leg" x1="185" y1="270" x2="215" y2="270"/>
+        <line class="leg" x1="185" y1="310" x2="215" y2="310"/>
+        <text class="pin" x="196" y="64">1</text><text class="pin sm" x="30" y="75">A &nbsp;→ 1A</text>
+        <text class="pin" x="196" y="104">2</text><text class="pin sm" x="30" y="115">B &nbsp;→ 1B</text>
+        <text class="pin" x="196" y="144">3</text><text class="pin sm" x="30" y="155">1Y → N</text>
+        <text class="pin" x="196" y="184">4</text><text class="pin sm" x="30" y="195">A &nbsp;→ 2A</text>
+        <text class="pin" x="196" y="224">5</text><text class="pin sm" x="30" y="235">N &nbsp;→ 2B</text>
+        <text class="pin" x="196" y="264">6</text><text class="pin sm" x="30" y="275">2Y → P</text>
+        <text class="pin" x="196" y="304">7</text><text class="pin sm" x="30" y="315">GND</text>
+
+        <!-- right pins 8-14 -->
+        <line class="leg" x1="385" y1="70"  x2="415" y2="70"/>
+        <line class="leg" x1="385" y1="110" x2="415" y2="110"/>
+        <line class="leg" x1="385" y1="150" x2="415" y2="150"/>
+        <line class="leg" x1="385" y1="190" x2="415" y2="190"/>
+        <line class="leg" x1="385" y1="230" x2="415" y2="230"/>
+        <line class="leg" x1="385" y1="270" x2="415" y2="270"/>
+        <line class="leg" x1="385" y1="310" x2="415" y2="310"/>
+        <text class="pin" x="392" y="64">14</text><text class="pin sm" x="430" y="75">Vcc &nbsp;+5 V</text>
+        <text class="pin" x="392" y="104">13</text><text class="pin sm" x="430" y="115">4B ← Q</text>
+        <text class="pin" x="392" y="144">12</text><text class="pin sm" x="430" y="155">4A ← P</text>
+        <text class="pin" x="392" y="184">11</text><text class="pin sm" x="430" y="195">4Y → X</text>
+        <text class="pin" x="392" y="224">10</text><text class="pin sm" x="430" y="235">3B ← B</text>
+        <text class="pin" x="392" y="264">9</text> <text class="pin sm" x="430" y="275">3A ← N</text>
+        <text class="pin" x="392" y="304">8</text> <text class="pin sm" x="430" y="315">3Y → Q</text>
+
+      </svg>
+    </div>
+    <figcaption>Notch at top; pin 1 is top-left and numbering runs counter-clockwise.
+    Gate 1 = pins 1,2→3. Gate 2 = pins 4,5→6. Gate 3 = pins 9,10→8.
+    Gate 4 = pins 12,13→11.</figcaption>
+  </figure>
+
+  <h3>The four jumpers</h3>
+  <p>Everything beyond power, inputs, and output is four short wires:</p>
+
+  <div class="tbl-scroll">
+  <table>
+    <thead><tr><th class="lbl">Jumper</th><th class="lbl">Carries</th><th class="lbl">Why</th></tr></thead>
+    <tbody>
+      <tr><td class="lbl">3 → 5</td><td class="lbl">N</td><td class="lbl">N into gate 2</td></tr>
+      <tr><td class="lbl">3 → 9</td><td class="lbl">N</td><td class="lbl">N into gate 3 — the fan-out node</td></tr>
+      <tr><td class="lbl">6 → 12</td><td class="lbl">P</td><td class="lbl">gate 2 output into gate 4</td></tr>
+      <tr><td class="lbl">8 → 13</td><td class="lbl">Q</td><td class="lbl">gate 3 output into gate 4</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Input A goes to pins 1 and 4; input B goes to pins 2 and 10. Power on pin 14, ground on
+  pin 7, output read at pin 11.</p>
+
+  <h3>Things that go wrong</h3>
+  <ul class="check">
+    <li><strong>Floating inputs.</strong> An unconnected TTL input floats high and picks up noise.
+    Tie every input to a defined level through a switch and pull-down, never leave one dangling.</li>
+    <li><strong>Missing decoupling.</strong> A 0.1 µF ceramic across pins 14 and 7, right at the
+    package, prevents switching transients from upsetting the other gates.</li>
+    <li><strong>Chip in backwards.</strong> The notch marks the pin-1 end. Reversed power usually
+    kills the part immediately and audibly.</li>
+    <li><strong>Reading the wrong output.</strong> Pin 11 is X. Pins 3, 6, and 8 are intermediate
+    nodes — useful for probing, wrong for grading.</li>
+  </ul>
+
+  <div class="note">
+    <p class="kicker">A good lab exercise</p>
+    <p>Wire the four-NAND XOR, verify all four rows with a logic probe or LED, then drop a 7486
+    quad XOR into the adjacent rows of the breadboard and confirm the two agree row for row.
+    Students have then reproduced a real commercial part from primitives, and can see on a scope
+    that the discrete version is measurably slower — the first time propagation delay stops
+    being an abstraction.</p>
+  </div>
+</section>
+
+<!-- ======================= 7. UNIVERSALITY ======================= -->
+<section id="universal">
+  <p class="kicker">Why this always works</p>
+  <h2>NAND is universal</h2>
+  <p>The reduction above was not luck. NAND can express all three Boolean primitives, so it can
+  express anything built from them — every combinational function, without exception. The proof
+  is three lines:</p>
+
+  <div class="tbl-scroll">
+  <table>
+    <thead><tr><th class="lbl">Primitive</th><th class="lbl">From NAND</th><th class="lbl">Gates</th></tr></thead>
+    <tbody>
+      <tr><td class="lbl">NOT A</td><td class="lbl">~(A &amp; A)</td><td>1</td></tr>
+      <tr><td class="lbl">A AND B</td><td class="lbl">~( ~(A&amp;B) &amp; ~(A&amp;B) )</td><td>2</td></tr>
+      <tr><td class="lbl">A OR B</td><td class="lbl">~( ~(A&amp;A) &amp; ~(B&amp;B) )</td><td>3</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Tying both inputs of a NAND together turns it into an inverter, and everything else follows.
+  NOR is universal for the same reason, by the mirror-image argument. These are the only two
+  two-input gates with the property — which is why silicon libraries are built around them and
+  why a NAND-only redesign is always available as a fallback.</p>
+
+  <p>Note the cost, though. Mechanically substituting NAND equivalents into the four-gate
+  factored circuit would give 1 + 3 + 2 = plus the inverter — considerably more than four. The
+  four-gate result came from algebraic restructuring, not substitution. Universality guarantees
+  a NAND-only circuit exists; it says nothing about it being small.</p>
+</section>
+
+<!-- ======================= 8. ALGEBRA ======================= -->
+<section id="algebra">
+  <p class="kicker">Properties</p>
+  <h2>XOR as arithmetic</h2>
+  <p>XOR behaves like addition modulo 2, and that identity is the reason it is so useful. Every
+  property below is a restatement of "add the bits and throw away the carry."</p>
+
+  <div class="tbl-scroll">
+  <table>
+    <thead><tr><th class="lbl">Identity</th><th class="lbl">Meaning</th></tr></thead>
+    <tbody>
+      <tr><td class="lbl">A ⊕ 0 = A</td><td class="lbl">0 is the identity element</td></tr>
+      <tr><td class="lbl">A ⊕ 1 = ~A</td><td class="lbl">XOR with 1 is a controllable inverter</td></tr>
+      <tr><td class="lbl">A ⊕ A = 0</td><td class="lbl">every element is its own inverse</td></tr>
+      <tr><td class="lbl">A ⊕ B = B ⊕ A</td><td class="lbl">commutative</td></tr>
+      <tr><td class="lbl">(A ⊕ B) ⊕ C = A ⊕ (B ⊕ C)</td><td class="lbl">associative — so multi-input XOR is unambiguous</td></tr>
+      <tr><td class="lbl">A ⊕ B ⊕ B = A</td><td class="lbl">applying the same key twice restores the original</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The second line is the workhorse. An XOR gate with one input tied to a control signal is a
+  <em>programmable inverter</em>: pass the data through when control is 0, invert it when control
+  is 1. Adders use exactly this to switch between addition and subtraction, since subtracting is
+  adding the two's complement, and forming the two's complement means inverting.</p>
+
+  <p>The last line is why XOR appears in cryptography. Encryption and decryption are the same
+  operation with the same key, which makes the hardware trivially symmetric. With a truly random
+  key used once, that is a one-time pad — provably unbreakable, and impractical because the key
+  must be as long as the message.</p>
+
+  <p>Associativity matters more than it looks. Because grouping does not change the answer, an
+  n-input XOR can be built as a balanced tree of two-input gates rather than a chain, cutting the
+  depth from n−1 to log₂n. For a 32-bit parity tree that is the difference between 31 gate delays
+  and 5.</p>
+</section>
+
+<!-- ======================= 9. APPLICATIONS ======================= -->
+<section id="uses">
+  <p class="kicker">Where it turns up</p>
+  <h2>Difference detection in the wild</h2>
+
+  <div class="cols">
+    <div>
+      <h3>Half and full adders</h3>
+      <p>The sum bit of a half adder is <code>A ⊕ B</code> and the carry is <code>A &amp; B</code>.
+      A full adder is two half adders plus an OR. Every binary adder ever fabricated has XOR
+      gates on its critical path.</p>
+
+      <h3>Parity</h3>
+      <p>XOR a whole word together and the result is 1 exactly when an odd number of bits are set.
+      That single bit, transmitted alongside the data, catches any single-bit error. RAID 5 uses
+      the same idea across whole disks — the parity drive is the XOR of the others, so any one
+      lost drive can be reconstructed.</p>
+
+      <h3>Comparators</h3>
+      <p>Two words are equal when every bitwise XOR is 0, so an equality test is a row of XORs
+      feeding a NOR.</p>
+    </div>
+    <div>
+      <h3>Gray code</h3>
+      <p>Converting binary to Gray code is <code>G[i] = B[i] ⊕ B[i+1]</code> — one XOR per bit.
+      Gray code changes only one bit per step, which is why rotary encoders use it: no
+      intermediate wrong reading during a transition.</p>
+
+      <h3>Pseudorandom sequences</h3>
+      <p>A linear-feedback shift register XORs selected taps back into its input. With the right
+      taps it cycles through every non-zero state before repeating, giving cheap deterministic
+      noise for BER testing and spread spectrum.</p>
+
+      <h3>Controlled-NOT</h3>
+      <p>The quantum CNOT gate flips its target qubit when the control is 1 — on basis states,
+      exactly XOR. Unlike the classical gate it must be reversible, which is why it keeps both
+      inputs rather than collapsing two wires into one.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <p class="kicker">The XOR swap</p>
+    <p>Three XORs exchange two registers with no temporary: <code>a ^= b; b ^= a; a ^= b;</code>.
+    It works because of self-inverse and associativity. It is also a bad idea in real code —
+    it breaks when both operands are the same variable, and modern compilers produce faster
+    ordinary swaps. Worth knowing as an illustration of the algebra, not as a technique.</p>
+  </div>
+</section>
+
+<!-- ======================= 10. TRANSISTORS ======================= -->
+<section id="silicon">
+  <p class="kicker">Below the gate level</p>
+  <h2>What it costs in transistors</h2>
+  <p>Gate counting is the right abstraction for breadboard work but the wrong one for silicon.
+  In static CMOS a two-input NAND takes four transistors, so the four-NAND XOR costs sixteen —
+  respectable, but not what a chip designer would use.</p>
+
+  <p>Custom cells do better by abandoning the gate abstraction entirely. A transmission-gate XOR
+  steers one input through pass transistors under control of the other, and lands around six to
+  eight transistors including the inverter it needs for the complement. The saving is real but it
+  comes with weaker output drive and worse behaviour when cascaded, so cell libraries usually
+  offer several XOR variants at different sizes and let the synthesis tool choose.</p>
+
+  <p>The general point is worth carrying forward: <em>minimal gate count and minimal area are
+  different objectives</em>, and neither automatically gives minimal delay or minimal power. The
+  four-NAND circuit is optimal for the question "how few 7400-style gates?" and unremarkable for
+  any of the others.</p>
+</section>
+
+<!-- ======================= 11. EXERCISES ======================= -->
+<section id="exercises">
+  <p class="kicker">Try these</p>
+  <h2>Exercises</h2>
+  <ul class="check">
+    <li>Derive the five-gate NOR-only XOR by the same method used in section 5, starting from
+    <code>(A|B) &amp; ~(A&amp;B)</code> and pushing everything through De Morgan the other way.</li>
+    <li>Show that XNOR — the complement of XOR, high when inputs agree — needs only one extra
+    inverter, or can be had by rearranging the same four NANDs.</li>
+    <li>Write the three-input XOR truth table. Confirm it is high for odd numbers of 1s, then
+    build it from two two-input XORs and explain why associativity permits this.</li>
+    <li>The circuit in section 5 has a fan-out of two on node N. Redraw it so that no node drives
+    more than one gate, and count how many gates that costs.</li>
+    <li>Take the K-map argument further: sketch a three-variable map for A ⊕ B ⊕ C and confirm
+    that no two 1s are adjacent, so all four minterms survive minimisation.</li>
+    <li>On a scope, trigger on a rising edge of A with B held high and measure the delay to X.
+    Compare against the sum of the datasheet's typical values for three gates.</li>
+  </ul>
+</section>
+
+<footer>
+  Interactive logic explainer · notation: <code>&amp;</code> AND, <code>|</code> OR,
+  <code>~</code> NOT, <code>⊕</code> XOR · amber indicates logic HIGH throughout.
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var A=false,B=false;
+  var swA=document.getElementById('swA'),swB=document.getElementById('swB');
+
+  function compute(){
+    var s={};
+    s.a=A; s.b=B;
+    s.na=!A; s.nb=!B;
+    s.and=A&&B; s.or=A||B;
+    s.n=!(A&&B);
+    s.p=!(s.n&&A);
+    s.q=!(s.n&&B);
+    s.x=!(s.p&&s.q);
+    s.t1=(!A)&&B;
+    s.t2=A&&(!B);
+    return s;
+  }
+
+  function render(){
+    var s=compute();
+
+    // switch faces
+    swA.setAttribute('aria-pressed',A);
+    swB.setAttribute('aria-pressed',B);
+    swA.querySelector('.lamp').textContent=A?'1':'0';
+    swB.querySelector('.lamp').textContent=B?'1':'0';
+
+    // value chips
+    document.querySelectorAll('.val').forEach(function(el){
+      var v=s[el.dataset.sig];
+      el.textContent=v?'1':'0';
+      el.classList.toggle('hi',!!v);
+    });
+
+    // wires and junction dots
+    document.querySelectorAll('.wire,.jn').forEach(function(el){
+      el.classList.toggle('hi',!!s[el.dataset.sig]);
+    });
+
+    // active truth-table row
+    var row=(A?2:0)+(B?1:0);
+    document.querySelectorAll('tbody tr[data-row]').forEach(function(tr){
+      tr.classList.toggle('active',+tr.dataset.row===row);
+    });
+  }
+
+  swA.addEventListener('click',function(){A=!A;render();});
+  swB.addEventListener('click',function(){B=!B;render();});
+
+  var timer=null,step=0;
+  document.getElementById('cycle').addEventListener('click',function(){
+    var btn=this;
+    if(timer){clearInterval(timer);timer=null;btn.textContent='Step through all four rows';return;}
+    btn.textContent='Stop';
+    step=0;
+    timer=setInterval(function(){
+      A=!!(step&2); B=!!(step&1); render();
+      step=(step+1)%4;
+    },900);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
