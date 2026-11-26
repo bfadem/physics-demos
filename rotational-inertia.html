@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rotational Inertia</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  :root{
+    color-scheme: light;
+    --surface-1:#ffffff; --plane:#f9f9f9;
+    --text-1:#191919; --text-2:#666666;
+    --grid:#e7e7e7; --axis:#c2c2c2; --border:rgba(11,11,11,0.10);
+    --accent:#257de0; --twist:#ec4647; --good:#0aac23;
+    --bar:#6b6b6b; --barface:#d9d9d9; --mass:#7a5c2e; --wedge:rgba(37,125,224,0.12);
+    --c1:#257de0; --c2:#e08a1e; --c3:#0aac23; --c4:#8b5cf6; --c5:#d6409f; --c6:#6b6b6b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --surface-1:#191919; --plane:#0b0b0b;
+      --text-1:#efefef; --text-2:#9c9c9c;
+      --grid:#303030; --axis:#474747; --border:rgba(255,255,255,0.10);
+      --accent:#338ced; --twist:#eb6263; --good:#0aac23;
+      --bar:#8a8a8a; --barface:#3a3a3a; --mass:#b48a4a; --wedge:rgba(51,140,237,0.16);
+      --c1:#338ced; --c2:#f0a040; --c3:#22c03a; --c4:#a07cf8; --c5:#e866b4; --c6:#9c9c9c;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-1:#191919; --plane:#0b0b0b;
+    --text-1:#efefef; --text-2:#9c9c9c;
+    --grid:#303030; --axis:#474747; --border:rgba(255,255,255,0.10);
+    --accent:#338ced; --twist:#eb6263; --good:#0aac23;
+    --bar:#8a8a8a; --barface:#3a3a3a; --mass:#b48a4a; --wedge:rgba(51,140,237,0.16);
+    --c1:#338ced; --c2:#f0a040; --c3:#22c03a; --c4:#a07cf8; --c5:#e866b4; --c6:#9c9c9c;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--plane); color:var(--text-1);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-size:15px; line-height:1.45;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:6px}
+  h1{font-size:22px;margin:0;font-weight:600;letter-spacing:-0.01em}
+  .sub{color:var(--text-2);font-size:14px;margin:2px 0 0}
+  .spacer{flex:1}
+
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--surface-1)}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--text-2);font:inherit;font-size:13.5px;padding:7px 14px;cursor:pointer}
+  .seg button+button{border-left:1px solid var(--border)}
+  .seg button[aria-pressed="true"]{background:var(--text-1);color:var(--surface-1)}
+
+  .grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;margin-top:14px}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-2);margin:0 0 10px;font-weight:600}
+  .stack > .card + .card{margin-top:16px}
+
+  svg.stage{width:100%;height:auto;display:block;touch-action:none}
+  .verdict{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;min-height:26px;flex-wrap:wrap}
+  .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+  .verdict strong{font-weight:600}
+  .nums{font-size:13.5px;color:var(--text-2);font-variant-numeric:tabular-nums}
+
+  .btn{appearance:none;font:inherit;font-size:13px;padding:6px 11px;border-radius:8px;cursor:pointer;border:1px solid var(--border);background:var(--surface-1);color:var(--text-1)}
+  .btn:hover{background:var(--plane)}
+  .btn.primary{background:var(--text-1);color:var(--surface-1);border-color:var(--text-1)}
+  .btn[disabled]{opacity:0.45;cursor:not-allowed}
+  .btn[aria-pressed="true"]{background:var(--text-1);color:var(--surface-1);border-color:var(--text-1)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;align-items:center}
+
+  .settings{display:grid;grid-template-columns:1fr 1fr;gap:9px;font-size:13px}
+  .settings label{display:block;color:var(--text-2);font-size:12px;margin-bottom:2px}
+  select{font:inherit;font-size:13px;padding:4px 6px;border-radius:7px;background:var(--surface-1);color:var(--text-1);border:1px solid var(--border);width:100%}
+  .check{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-1);margin-top:9px}
+  .check input{accent-color:var(--accent)}
+
+  .legend{display:flex;gap:6px 14px;font-size:12.5px;color:var(--text-1);margin-top:8px;flex-wrap:wrap}
+  .swatch{display:inline-block;width:12px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+  .howto details{border-top:1px solid var(--border);padding:7px 0}
+  .howto details:first-of-type{border-top:none}
+  .howto summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-1)}
+  .howto ol,.howto ul{margin:7px 0 2px;padding-left:20px;font-size:13px;color:var(--text-1)}
+  .howto li{margin:3px 0}
+  .howto p{font-size:13px;color:var(--text-2);margin:6px 0 0}
+  .actnav{display:flex;gap:6px;margin:4px 0 10px;flex-wrap:wrap}
+  .actnav button{appearance:none;font:inherit;font-size:13.5px;min-width:38px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-1);cursor:pointer}
+  .actnav button[aria-pressed="true"]{background:var(--text-1);color:var(--surface-1);border-color:var(--text-1)}
+  .act h3{font-size:14px;margin:0 0 6px;color:var(--text-1)}
+  .act ol{margin:6px 0 4px;padding-left:20px;font-size:13px;color:var(--text-1)}
+  .act li{margin:4px 0}
+  .act p{font-size:13px;color:var(--text-2);margin:6px 0 0}
+  .pred{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .predmsg{font-size:13px;color:var(--text-1);margin-top:8px;min-height:18px}
+  .note{font-size:12.5px;color:var(--text-2);margin:9px 0 0}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  footer{max-width:1180px;margin:0 auto;padding-block:0 40px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));color:var(--text-2);font-size:12.5px}
+  footer h3{font-size:13px;color:var(--text-1);margin:16px 0 5px}
+  footer p{margin:5px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Rotational Inertia</h1>
+      <p class="sub">Top view of a flat bar bolted to the end of a vertical rod, like a helicopter blade. Your fingers twist the rod back and forth with the same twist every time. Change where the masses sit and watch how far the bar swings.</p>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="group" aria-label="View">
+      <button id="v-single" aria-pressed="true" title="One bar you can set up yourself">One bar</button>
+      <button id="v-compare" aria-pressed="false" title="The three setups from the activity, twisted together">Compare three</button>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ---------- stage and swing record ---------- -->
+    <div class="stack">
+      <div class="card">
+        <svg class="stage" id="stage" viewBox="0 0 1000 560" role="application"
+             aria-label="Top view of a bar on a vertical rod with two masses that can be bolted into its holes."></svg>
+        <svg class="stage" id="cmp" viewBox="0 0 1000 380" style="display:none" role="img"
+             aria-label="Three bars side by side: no masses, masses near the middle, masses far out, all twisted the same way."></svg>
+        <div class="verdict" id="verdict"></div>
+        <div class="sr" id="live" role="status" aria-live="polite"></div>
+        <div class="btnrow" style="margin-top:8px">
+          <button class="btn primary" id="go">Start twisting</button>
+          <span class="note" id="draghint" style="margin:0"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Swing record</h2>
+        <p class="sub" style="margin:0 0 6px">How far the bar has turned from its starting line, over the first three seconds of twisting. Every setup you try is kept here, all drawn to the same scale.</p>
+        <svg class="stage" id="trace" viewBox="0 0 1000 260" role="img" aria-label="Angle turned against time for each setup tried"></svg>
+        <div class="legend" id="legend"></div>
+        <div class="btnrow" style="margin-top:8px"><button class="btn" id="clrtrace">Clear record</button></div>
+      </div>
+    </div>
+
+    <!-- ---------- guide and controls ---------- -->
+    <div class="stack">
+      <div class="card act" id="act">
+        <h2>Activity 12.6.1: Rotational inertia factors</h2>
+        <p class="sub" style="margin:0">Work through the parts in your Activity Guide. Each part's button sets up the bar for you.</p>
+        <div class="actnav" role="group" aria-label="Part of the activity" id="actnav"></div>
+        <div id="actbody"></div>
+      </div>
+
+      <div class="card">
+        <h2>Setup</h2>
+        <div class="btnrow" role="group" aria-label="Preset setups">
+          <button class="btn" data-preset="none">No masses</button>
+          <button class="btn" data-preset="near">Near the middle</button>
+          <button class="btn" data-preset="far">Far out</button>
+        </div>
+        <div class="settings" style="margin-top:12px">
+          <div>
+            <label for="massSel">Each mass</label>
+            <select id="massSel">
+              <option value="100">100 g</option>
+              <option value="200" selected>200 g</option>
+              <option value="500">500 g</option>
+            </select>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="shownums"> Show numbers (rotational inertia and swing angle)</label>
+      </div>
+
+      <div class="card howto" id="howto">
+        <h2>Using the app</h2>
+        <details>
+          <summary>Moving the masses</summary>
+          <ol>
+            <li>Drag a mass onto any hole on the bar. It bolts into the nearest hole.</li>
+            <li>Drag a mass into the tray on the right to take it off the bar.</li>
+            <li>The presets put both masses in the holes closest to the rod, in the holes farthest out, or in the tray.</li>
+          </ol>
+        </details>
+        <details>
+          <summary>The twist</summary>
+          <p>The red arrow at the top left is your fingers on the rod. The twist is always the same size: one way for half a second, then the other way, over and over. Nothing on the page can change how hard you twist.</p>
+        </details>
+        <details>
+          <summary>Compare three</summary>
+          <p>Shows the three setups from the activity next to each other, all getting the same twist at the same moment.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <h3>How the apparatus is modeled</h3>
+  <p>You are looking down the rod. A light aluminum bar (32&nbsp;cm long, 60&nbsp;g) is screwed to the end of the rod at its center
+     and has six holes on each side, 2.5&nbsp;cm apart. Each mass is a round 200&nbsp;g slug (unless you choose another size) bolted into a hole.
+     There is no friction, so the only thing that decides how the bar responds is how its mass is spread out around the rod.</p>
+  <p>Your twist is a torque of 0.013&nbsp;N&middot;m that reverses every half second. The first push lasts a quarter second, so the bar
+     swings between its starting line and the far edge of the shaded wedge instead of drifting off to one side.</p>
+  <h3>The physics (for the curious)</h3>
+  <p>For a twist that switches direction every <i>h</i> seconds, the bar swings through an angle of
+     <b>&tau;&thinsp;h&sup2; / (4&thinsp;I)</b>, where <i>I</i> is the rotational inertia. The same twist gives a smaller swing when <i>I</i> is larger.</p>
+  <p><i>I</i> adds up the rod, the bar (<i>M</i>&thinsp;<i>L</i>&sup2;/12) and each mass (<i>m</i>&thinsp;<i>r</i>&sup2;, plus a small amount for the slug's own size),
+     where <i>r</i> is the distance from the rod to the mass.</p>
+  <p>These sizes are typical values, not measurements of a particular lab's equipment.</p>
+</footer>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ model */
+
+const P = {
+  barL: 0.32, barM: 0.060, barW: 0.025,    // m, kg, m
+  holes: 6, spacing: 0.025,                 // holes per side, m between holes
+  rodR: 0.00635, rodM: 0.068,               // m, kg (half-inch aluminum rod)
+  slugR: 0.017,                             // m, radius of each round mass
+  tau: 0.013,                               // N m, the fixed finger twist
+  h: 0.5                                    // s between reversals
+};
+
+const S = {
+  massG: 200,
+  masses: [{id:1, hole:null}, {id:2, hole:null}],
+  view: "single",
+  nums: false,
+  running: false, t0: 0, t: 0,
+  tried: [],            // setups seen in the swing record: {key, label, cfg, color}
+  part: null,
+  pred: {b:null, d:null},
+  drag: null            // {id, x, y} while a mass is dragged
+};
+
+function rodI(){ return 0.5*P.rodM*P.rodR*P.rodR; }
+function barI(){ return P.barM*P.barL*P.barL/12; }
+function holeR(n){ return Math.abs(n)*P.spacing; }
+function massI(grams, hole){
+  if (hole === null || hole === undefined) return 0;
+  const m = grams/1000, r = holeR(hole);
+  return m*r*r + 0.5*m*P.slugR*P.slugR;
+}
+// cfg = {massG, holes:[h1,h2]} with null for a mass in the tray
+function inertia(cfg){
+  return rodI() + barI() + cfg.holes.reduce(function(a,h){ return a + massI(cfg.massG, h); }, 0);
+}
+function cfgNow(){ return {massG: S.massG, holes: S.masses.map(function(m){ return m.hole; })}; }
+function swing(cfg){ return P.tau*P.h*P.h/(4*inertia(cfg)); }            // rad, peak-to-peak
+function swingDeg(cfg){ return swing(cfg)*180/Math.PI; }
+
+// twist direction at time t: +1 counterclockwise, -1 clockwise
+function twistSign(t){
+  if (t < P.h/2) return 1;
+  const k = Math.floor((t - P.h/2)/P.h);
+  return (k % 2 === 0) ? -1 : 1;
+}
+// exact angle (rad) from rest under the square-wave twist; swings between 0 and swing(cfg)
+function thetaAt(t, cfg){
+  const a = P.tau/inertia(cfg), h = P.h, A = a*h*h/8;
+  if (t <= 0) return 0;
+  if (t < h/2) return 0.5*a*t*t;
+  const u = t - h/2, k = Math.floor(u/h), s = u - k*h;
+  if (k % 2 === 0) return A + (a*h/2)*s - 0.5*a*s*s;
+  return A - (a*h/2)*s + 0.5*a*s*s;
+}
+function omegaAt(t, cfg){                                                 // rad/s
+  const a = P.tau/inertia(cfg), h = P.h;
+  if (t <= 0) return 0;
+  if (t < h/2) return a*t;
+  const u = t - h/2, k = Math.floor(u/h), s = u - k*h;
+  return (k % 2 === 0) ? a*h/2 - a*s : -a*h/2 + a*s;
+}
+
+const CFG = {
+  none: function(){ return {massG:S.massG, holes:[null, null]}; },
+  near: function(){ return {massG:S.massG, holes:[-1, 1]}; },
+  far:  function(){ return {massG:S.massG, holes:[-P.holes, P.holes]}; }
+};
+function cfgKey(cfg){
+  const hs = cfg.holes.filter(function(h){ return h !== null; }).sort(function(a,b){ return a-b; });
+  return hs.length ? hs.join(",") + "@" + cfg.massG : "none";
+}
+function cfgLabel(cfg){
+  const hs = cfg.holes.filter(function(h){ return h !== null; }).sort(function(a,b){ return a-b; });
+  if (!hs.length) return "No masses";
+  const sz = cfg.massG === 200 ? "" : " (" + cfg.massG + " g each)";
+  if (hs.length === 2 && hs[0] === -1 && hs[1] === 1) return "Masses near the middle" + sz;
+  if (hs.length === 2 && hs[0] === -P.holes && hs[1] === P.holes) return "Masses far out" + sz;
+  if (hs.length === 1) return "One mass, " + (holeR(hs[0])*100).toFixed(1) + " cm out" + sz;
+  return "Masses " + (holeR(hs[0])*100).toFixed(1) + " and " + (holeR(hs[1])*100).toFixed(1) + " cm out" + sz;
+}
+// plain-words size of the swing, compared with the bare bar under the same twist
+function swingWords(cfg){
+  const f = swing(cfg)/swing(CFG.none());
+  if (f > 0.85) return "Wide swing";
+  if (f > 0.45) return "Medium swing";
+  if (f > 0.15) return "Small swing";
+  return "Tiny swing";
+}
+
+/* -------------------------------------------------------------- geometry */
+
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs){
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+function txt(x, y, s, attrs){
+  const t = el("text", Object.assign({x:x, y:y, fill:"var(--text-2)", "font-size":"12", "font-family":"inherit", "text-anchor":"middle"}, attrs||{}));
+  t.textContent = s; return t;
+}
+function clear(svg){ while (svg.firstChild) svg.removeChild(svg.firstChild); }
+
+const ST = {cx:440, cy:285, ppm:230/0.16};       // single view: px per metre so the bar's half-length is 230 px
+const TRAY = {x:860, y:200, w:110, h:170};
+function trayPos(i){ return {x: TRAY.x + TRAY.w/2, y: TRAY.y + 48 + i*72}; }
+
+// draws one bar assembly into group g, rotated by ang (rad, counterclockwise)
+function drawBar(g, cx, cy, ppm, cfg, ang, opts){
+  opts = opts || {};
+  const halfPx = P.barL/2*ppm, wPx = P.barW*ppm;
+  const deg = -ang*180/Math.PI;
+  const rg = el("g", {transform:"rotate(" + deg + " " + cx + " " + cy + ")"});
+  rg.appendChild(el("rect", {x:cx-halfPx, y:cy-wPx/2, width:2*halfPx, height:wPx, rx:wPx/4,
+    fill:"var(--barface)", stroke:"var(--bar)", "stroke-width":1.5}));
+  for (let n = -P.holes; n <= P.holes; n++){
+    if (n === 0) continue;
+    const x = cx + Math.sign(n)*holeR(n)*ppm;
+    rg.appendChild(el("circle", {cx:x, cy:cy, r:Math.max(2.2, wPx*0.13), fill:"var(--surface-1)", stroke:"var(--bar)", "stroke-width":1.1}));
+  }
+  // rod end, seen from above, with the screw head
+  rg.appendChild(el("circle", {cx:cx, cy:cy, r:Math.max(5, P.rodR*ppm*1.4), fill:"var(--surface-1)", stroke:"var(--bar)", "stroke-width":2.2}));
+  rg.appendChild(el("line", {x1:cx-4, y1:cy, x2:cx+4, y2:cy, stroke:"var(--bar)", "stroke-width":1.6}));
+  cfg.holes.forEach(function(hole, i){
+    if (hole === null) return;
+    if (opts.skip === i) return;
+    const x = cx + Math.sign(hole)*holeR(hole)*ppm;
+    const c = el("circle", {cx:x, cy:cy, r:P.slugR*ppm, fill:"var(--mass)", opacity:0.92, stroke:"var(--bar)", "stroke-width":1});
+    if (opts.handles){ c.setAttribute("class","mhandle"); c.dataset.idx = i; c.setAttribute("style","cursor:grab"); }
+    rg.appendChild(c);
+    rg.appendChild(el("circle", {cx:x, cy:cy, r:3, fill:"var(--surface-1)", "pointer-events":"none"}));
+  });
+  g.appendChild(rg);
+}
+
+// swing wedge: sector from the starting line to the far edge of the swing
+function drawWedge(g, cx, cy, r, sw){
+  if (sw < 0.002) return;
+  const a = Math.min(sw, 2*Math.PI - 0.01);
+  for (const side of [1, -1]){                       // both ends of the bar sweep a wedge
+    const a0 = side > 0 ? 0 : Math.PI, a1 = a0 + a;
+    const x0 = cx + r*Math.cos(a0), y0 = cy - r*Math.sin(a0);
+    const x1 = cx + r*Math.cos(a1), y1 = cy - r*Math.sin(a1);
+    g.appendChild(el("path", {d:"M " + cx + " " + cy + " L " + x0 + " " + y0 + " A " + r + " " + r + " 0 " + (a > Math.PI ? 1 : 0) + " 0 " + x1 + " " + y1 + " Z",
+      fill:"var(--wedge)", stroke:"none"}));
+  }
+}
+
+// curved arrow showing the current twist direction (always the same size)
+function drawTwist(g, cx, cy, r, sign, label){
+  const a0 = sign > 0 ? -50 : 230, a1 = sign > 0 ? 230 : -50;
+  const p = function(a){ return {x: cx + r*Math.cos(a*Math.PI/180), y: cy - r*Math.sin(a*Math.PI/180)}; };
+  const s = p(a0), e = p(a1);
+  g.appendChild(el("circle", {cx:cx, cy:cy, r:6, fill:"var(--surface-1)", stroke:"var(--bar)", "stroke-width":2}));
+  g.appendChild(el("path", {d:"M " + s.x + " " + s.y + " A " + r + " " + r + " 0 1 " + (sign > 0 ? 0 : 1) + " " + e.x + " " + e.y,
+    fill:"none", stroke:"var(--twist)", "stroke-width":3.2}));
+  const ae = a1*Math.PI/180, tx = -Math.sin(ae)*sign, ty = -Math.cos(ae)*sign;
+  const px = -ty, py = tx, sz = 11;
+  g.appendChild(el("polygon", {points: [e.x + "," + e.y,
+    (e.x - tx*sz + px*sz*0.55) + "," + (e.y - ty*sz + py*sz*0.55),
+    (e.x - tx*sz - px*sz*0.55) + "," + (e.y - ty*sz - py*sz*0.55)].join(" "), fill:"var(--twist)"}));
+  if (label) g.appendChild(txt(cx, cy + r + 18, label, {"font-size":"11.5"}));
+}
+
+/* ---------------------------------------------------------------- render */
+
+const stage = document.getElementById("stage"), cmp = document.getElementById("cmp");
+
+function drawStage(){
+  clear(stage);
+  const cfg = cfgNow(), sw = swing(cfg);
+  const ang = S.running ? thetaAt(S.t, cfg) : 0;
+  stage.appendChild(txt(20, 26, "Top view, looking down the rod", {"text-anchor":"start", "font-size":"12.5"}));
+
+  // your fingers: the twist, same size every time
+  const tw = el("g", {});
+  drawTwist(tw, 70, 92, 26, S.running ? twistSign(S.t) : 1, S.running ? "your twist" : "your twist (waiting)");
+  stage.appendChild(tw);
+
+  if (S.running) drawWedge(stage, ST.cx, ST.cy, P.barL/2*ST.ppm + 6, sw);
+  // starting line
+  const half = P.barL/2*ST.ppm + 14;
+  stage.appendChild(el("line", {x1:ST.cx-half, y1:ST.cy, x2:ST.cx+half, y2:ST.cy, stroke:"var(--axis)", "stroke-width":1.2, "stroke-dasharray":"6 5"}));
+  stage.appendChild(txt(ST.cx+half+4, ST.cy+4, "start", {"text-anchor":"start", "font-size":"11"}));
+
+  const dragIdx = S.drag ? S.drag.idx : -1;
+  drawBar(stage, ST.cx, ST.cy, ST.ppm, cfg, ang, {handles: !S.running, skip: dragIdx});
+
+  // tray for masses not on the bar
+  stage.appendChild(el("rect", {x:TRAY.x, y:TRAY.y, width:TRAY.w, height:TRAY.h, rx:10, fill:"none", stroke:"var(--axis)", "stroke-width":1.2, "stroke-dasharray":"4 4"}));
+  stage.appendChild(txt(TRAY.x + TRAY.w/2, TRAY.y - 8, "tray", {"font-size":"11.5"}));
+  S.masses.forEach(function(m, i){
+    if (m.hole !== null || i === dragIdx) return;
+    const p = trayPos(i);
+    const c = el("circle", {cx:p.x, cy:p.y, r:P.slugR*ST.ppm, fill:"var(--mass)", opacity:0.92, stroke:"var(--bar)", "stroke-width":1, class: S.running ? "" : "mhandle", style: S.running ? "" : "cursor:grab"});
+    c.dataset.idx = i;
+    stage.appendChild(c);
+    stage.appendChild(txt(p.x, p.y + P.slugR*ST.ppm + 14, S.massG + " g", {"font-size":"11"}));
+  });
+  if (S.drag){
+    stage.appendChild(el("circle", {cx:S.drag.x, cy:S.drag.y, r:P.slugR*ST.ppm, fill:"var(--mass)", opacity:0.7, stroke:"var(--text-1)", "stroke-width":1.5, "pointer-events":"none"}));
+  }
+
+  // distance labels under the resting bar
+  if (!S.running){
+    for (const n of [1, 3, 6]){
+      stage.appendChild(txt(ST.cx + holeR(n)*ST.ppm, ST.cy + 44, (holeR(n)*100).toFixed(1) + " cm", {"font-size":"10.5"}));
+    }
+    stage.appendChild(txt(ST.cx, ST.cy + 62, "distance from the rod", {"font-size":"10.5"}));
+  }
+}
+
+const CMP = [{k:"none", title:"No masses"}, {k:"near", title:"Masses near the middle"}, {k:"far", title:"Masses far out"}];
+function drawCompare(){
+  clear(cmp);
+  const ppm = 120/0.16;
+  CMP.forEach(function(c, i){
+    const cx = 167 + i*333, cy = 190, cfg = CFG[c.k]();
+    cmp.appendChild(txt(cx, 28, c.title, {fill:"var(--text-1)", "font-size":"13.5", "font-weight":"600"}));
+    if (S.running) drawWedge(cmp, cx, cy, 124, swing(cfg));
+    cmp.appendChild(el("line", {x1:cx-132, y1:cy, x2:cx+132, y2:cy, stroke:"var(--axis)", "stroke-width":1, "stroke-dasharray":"5 4"}));
+    drawBar(cmp, cx, cy, ppm, cfg, S.running ? thetaAt(S.t, cfg) : 0, {});
+    let words = swingWords(cfg);
+    if (S.nums) words += ", " + Math.round(swingDeg(cfg)) + "°";
+    cmp.appendChild(txt(cx, 352, S.running ? words : "", {fill:"var(--text-1)", "font-size":"12.5"}));
+  });
+  // one shared twist indicator: every panel gets this same twist
+  const tw = el("g", {});
+  drawTwist(tw, 30, 60, 16, S.running ? twistSign(S.t) : 1, "");
+  cmp.appendChild(tw);
+  cmp.appendChild(txt(30, 100, "same twist", {"font-size":"10.5"}));
+}
+
+function drawVerdict(){
+  const v = document.getElementById("verdict"), live = document.getElementById("live");
+  const cfg = cfgNow();
+  v.innerHTML = "";
+  if (S.view === "compare"){
+    v.innerHTML = '<span style="color:var(--text-2)">' + (S.running ? "All three get the same twist at the same moment." : "Press Start twisting to give all three the same twist.") + '</span>';
+    live.textContent = v.textContent;
+    if (S.nums) appendNums(v, null);
+    return;
+  }
+  const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = "var(--accent)";
+  const t = document.createElement("span");
+  const msg = cfgLabel(cfg) + (S.running ? ": " + swingWords(cfg).toLowerCase() : "");
+  t.innerHTML = "<strong>" + msg + "</strong>";
+  v.appendChild(dot); v.appendChild(t);
+  if (S.nums) appendNums(v, cfg);
+  live.textContent = msg;
+}
+function appendNums(v, cfg){
+  const n = document.createElement("span"); n.className = "nums";
+  if (cfg){
+    n.innerHTML = "&nbsp; I = " + (inertia(cfg)*1e4).toFixed(2) + " &times; 10<sup>&minus;4</sup> kg&middot;m&sup2; &middot; swing " +
+      swingDeg(cfg).toFixed(1) + "&deg; &middot; twist &tau; = " + P.tau.toFixed(3) + " N&middot;m";
+  } else {
+    n.innerHTML = "&nbsp; " + CMP.map(function(c){ return c.title + ": I = " + (inertia(CFG[c.k]())*1e4).toFixed(2); }).join(" &middot; ") +
+      " (&times; 10<sup>&minus;4</sup> kg&middot;m&sup2;)";
+  }
+  v.appendChild(n);
+}
+
+/* ---------------------------------------------------------- swing record */
+
+const TR = {x0:70, x1:980, y0:34, y1:226, tmax:3};
+const COLORS = ["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)"];
+function noteTried(cfg){
+  const key = cfgKey(cfg);
+  if (S.tried.some(function(x){ return x.key === key; })) return;
+  const used = S.tried.map(function(x){ return x.color; });
+  const color = COLORS.find(function(c){ return used.indexOf(c) < 0; }) || COLORS[S.tried.length % COLORS.length];
+  S.tried.push({key:key, label:cfgLabel(cfg), cfg:{massG:cfg.massG, holes:cfg.holes.slice()}, color:color});
+  if (S.tried.length > 6) S.tried.shift();
+}
+function traceScale(){
+  // fixed scale: at least the bare bar's swing, so a smaller swing looks smaller
+  let m = swing(CFG.none());
+  S.tried.forEach(function(x){ m = Math.max(m, swing(x.cfg)); });
+  return m*1.08;
+}
+function traceTime(t){ return t < TR.tmax ? t : 2 + ((t - 2) % 1); }   // motion repeats every second after the first push
+function drawTrace(){
+  const svg = document.getElementById("trace");
+  clear(svg);
+  const ymax = traceScale();
+  const X = function(t){ return TR.x0 + (TR.x1 - TR.x0)*t/TR.tmax; };
+  const Y = function(a){ return TR.y1 - (TR.y1 - TR.y0)*a/ymax; };
+  // twist strip along the top
+  for (let t0 = 0; t0 < TR.tmax; ){
+    const s = twistSign(t0 + 1e-9);
+    const t1 = t0 < P.h/2 ? P.h/2 : Math.min(TR.tmax, t0 + P.h);
+    svg.appendChild(el("rect", {x:X(t0), y:s > 0 ? 8 : 18, width:X(t1)-X(t0), height:8, fill:"var(--twist)", opacity:0.55}));
+    t0 = t1;
+  }
+  svg.appendChild(txt(TR.x0 - 8, 20, "twist", {"text-anchor":"end", "font-size":"11"}));
+  // axes
+  svg.appendChild(el("line", {x1:TR.x0, y1:TR.y1, x2:TR.x1, y2:TR.y1, stroke:"var(--axis)", "stroke-width":1}));
+  svg.appendChild(el("line", {x1:TR.x0, y1:TR.y0, x2:TR.x0, y2:TR.y1, stroke:"var(--axis)", "stroke-width":1}));
+  for (let s = 0; s <= TR.tmax; s += 0.5){
+    svg.appendChild(el("line", {x1:X(s), y1:TR.y0, x2:X(s), y2:TR.y1, stroke:"var(--grid)", "stroke-width":1}));
+    if (s % 1 === 0) svg.appendChild(txt(X(s), TR.y1 + 16, s + " s", {"font-size":"11"}));
+  }
+  svg.appendChild(txt(TR.x0 - 8, TR.y1 + 4, "start", {"text-anchor":"end", "font-size":"11"}));
+  if (S.nums){
+    const step = ymax*180/Math.PI > 60 ? 30 : (ymax*180/Math.PI > 20 ? 10 : 2);
+    for (let d = step; d < ymax*180/Math.PI; d += step){
+      const y = Y(d*Math.PI/180);
+      svg.appendChild(el("line", {x1:TR.x0, y1:y, x2:TR.x1, y2:y, stroke:"var(--grid)", "stroke-width":1}));
+      svg.appendChild(txt(TR.x0 - 8, y + 4, d + "°", {"text-anchor":"end", "font-size":"11"}));
+    }
+  } else {
+    svg.appendChild(txt(TR.x0 - 8, TR.y0 + 10, "turned", {"text-anchor":"end", "font-size":"11"}));
+  }
+  const cur = cfgKey(cfgNow());
+  S.tried.forEach(function(x){
+    const pts = [];
+    for (let i = 0; i <= 300; i++){ const t = TR.tmax*i/300; pts.push(X(t).toFixed(1) + "," + Y(thetaAt(t, x.cfg)).toFixed(1)); }
+    const isCur = (S.view === "single" && x.key === cur);
+    svg.appendChild(el("polyline", {points:pts.join(" "), fill:"none", stroke:x.color, "stroke-width": isCur ? 3 : 1.8, opacity: isCur || S.view === "compare" ? 1 : 0.75}));
+  });
+  if (S.running){
+    const tt = traceTime(S.t);
+    svg.appendChild(el("line", {x1:X(tt), y1:TR.y0, x2:X(tt), y2:TR.y1, stroke:"var(--text-2)", "stroke-width":1, "stroke-dasharray":"3 3"}));
+    S.tried.forEach(function(x){
+      if (S.view === "single" && x.key !== cur) return;
+      svg.appendChild(el("circle", {cx:X(tt), cy:Y(thetaAt(tt, x.cfg)), r:5, fill:x.color}));
+    });
+  }
+  if (!S.tried.length) svg.appendChild(txt((TR.x0+TR.x1)/2, (TR.y0+TR.y1)/2, "Press Start twisting to draw the first swing.", {"font-size":"13"}));
+  drawLegend();
+}
+function drawLegend(){
+  const lg = document.getElementById("legend");
+  lg.innerHTML = S.tried.map(function(x){
+    return '<span><span class="swatch" style="background:' + x.color + '"></span>' + x.label +
+      (S.nums ? ' <span style="color:var(--text-2)">(' + swingDeg(x.cfg).toFixed(1) + '&deg;)</span>' : '') + '</span>';
+  }).join("");
+}
+document.getElementById("clrtrace").addEventListener("click", function(){
+  S.tried = [];
+  if (S.running){
+    if (S.view === "compare") CMP.forEach(function(c){ noteTried(CFG[c.k]()); }); else noteTried(cfgNow());
+  }
+  drawTrace();
+});
+
+/* ---------------------------------------------------------------- motion */
+
+let animId = null;
+function reduceMotion(){ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
+function frame(now){
+  if (!S.running){ animId = null; return; }
+  S.t = (now - S.t0)/1000;
+  drawMoving();
+  animId = requestAnimationFrame(frame);
+}
+function drawMoving(){
+  if (S.view === "compare") drawCompare(); else drawStage();
+  drawTrace();
+}
+function start(){
+  if (S.running) return;
+  S.running = true; S.t = 0;
+  if (S.view === "compare") CMP.forEach(function(c){ noteTried(CFG[c.k]()); }); else noteTried(cfgNow());
+  document.getElementById("go").textContent = "Stop twisting";
+  if (reduceMotion() || typeof requestAnimationFrame !== "function"){
+    S.t = 0.75;                  // show the bar at the far edge of its swing, without animating
+    renderAll(); return;
+  }
+  S.t0 = performance.now();
+  renderAll();
+  animId = requestAnimationFrame(frame);
+}
+function stop(){
+  if (animId !== null && typeof cancelAnimationFrame === "function") cancelAnimationFrame(animId);
+  animId = null;
+  if (!S.running) return;
+  S.running = false; S.t = 0;
+  document.getElementById("go").textContent = "Start twisting";
+  renderAll();
+}
+document.getElementById("go").addEventListener("click", function(){ if (S.running) stop(); else start(); });
+
+/* ------------------------------------------------------------- dragging */
+
+function svgPoint(ev){
+  const r = stage.getBoundingClientRect();
+  return {x: (ev.clientX - r.left)*(1000/r.width), y: (ev.clientY - r.top)*(560/r.height)};
+}
+// nearest hole for a point on the resting bar, or null for the tray / off the bar
+function holeFor(x, y){
+  if (x > TRAY.x - 20) return null;
+  if (Math.abs(y - ST.cy) > 70) return null;
+  const n = Math.round((x - ST.cx)/(P.spacing*ST.ppm));
+  if (n === 0) return Math.abs(x - ST.cx) < 1 ? 1 : Math.sign(x - ST.cx);
+  return Math.max(-P.holes, Math.min(P.holes, n));
+}
+function placeMass(idx, hole){
+  // returns true if the mass ended up where asked
+  if (hole !== null && S.masses.some(function(m, i){ return i !== idx && m.hole === hole; })) return false;
+  S.masses[idx].hole = hole;
+  return true;
+}
+stage.addEventListener("pointerdown", function(ev){
+  const t = ev.target;
+  if (S.running || !t.classList || !t.classList.contains("mhandle")) return;
+  const p = svgPoint(ev);
+  S.drag = {idx: +t.dataset.idx, x: p.x, y: p.y};
+  if (stage.setPointerCapture) stage.setPointerCapture(ev.pointerId);
+  ev.preventDefault();
+  drawStage();
+});
+stage.addEventListener("pointermove", function(ev){
+  if (!S.drag) return;
+  const p = svgPoint(ev);
+  S.drag.x = p.x; S.drag.y = p.y;
+  drawStage();
+});
+function endDrag(){
+  if (!S.drag) return;
+  const d = S.drag; S.drag = null;
+  placeMass(d.idx, holeFor(d.x, d.y));
+  renderAll();
+}
+stage.addEventListener("pointerup", endDrag);
+stage.addEventListener("pointercancel", endDrag);
+
+/* ---------------------------------------------------------------- setup */
+
+function setPreset(k){
+  stop();
+  const cfg = CFG[k]();
+  S.masses[0].hole = cfg.holes[0]; S.masses[1].hole = cfg.holes[1];
+  if (S.view !== "single") setView("single");
+  renderAll();
+}
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(b){
+  b.addEventListener("click", function(){ setPreset(b.dataset.preset); });
+});
+document.getElementById("massSel").addEventListener("change", function(e){
+  stop(); S.massG = +e.target.value; renderAll();
+});
+document.getElementById("shownums").addEventListener("change", function(e){
+  S.nums = e.target.checked; renderAll();
+});
+
+function setView(v){
+  const wasRunning = S.running;
+  stop();
+  S.view = v;
+  document.getElementById("v-single").setAttribute("aria-pressed", String(v === "single"));
+  document.getElementById("v-compare").setAttribute("aria-pressed", String(v === "compare"));
+  stage.style.display = v === "single" ? "" : "none";
+  cmp.style.display = v === "compare" ? "" : "none";
+  document.getElementById("draghint").textContent = v === "single"
+    ? "Drag a mass to any hole, or into the tray to take it off."
+    : "These three setups are fixed. Switch back to One bar to move the masses.";
+  renderAll();
+  if (wasRunning) start();
+}
+document.getElementById("v-single").addEventListener("click", function(){ setView("single"); });
+document.getElementById("v-compare").addEventListener("click", function(){ setView("compare"); });
+
+function renderAll(){
+  if (S.view === "compare") drawCompare(); else drawStage();
+  drawVerdict(); drawTrace();
+}
+
+/* ------------------------------------------------- Activity 12.6.1 guide */
+
+const PRED = [["easier","Easier"],["harder","Harder"],["same","About the same"]];
+const PREDWORD = {easier:"easier to turn", harder:"harder to turn", same:"about the same"};
+function predBlock(k, question){
+  let h = '<p style="color:var(--text-1)">' + question + '</p><div class="pred" role="group" aria-label="Your prediction">';
+  PRED.forEach(function(p){
+    h += '<button class="btn" data-pred="' + k + '" data-val="' + p[0] + '" aria-pressed="' + String(S.pred[k] === p[0]) + '">' + p[1] + '</button>';
+  });
+  h += '</div><p class="predmsg" id="predmsg">' + (S.pred[k] ? "Your prediction: " + PREDWORD[S.pred[k]] + ". Write down why in your Activity Guide." : "") + '</p>';
+  return h;
+}
+function yourPred(k){
+  return S.pred[k] ? '<p>You predicted: <b style="color:var(--text-1)">' + PREDWORD[S.pred[k]] + '</b>. Does what you see match?</p>'
+                   : '<p>You haven&rsquo;t made a prediction for this yet. Go back to part ' + (k === "b" ? "b" : "d") + ' first if you can.</p>';
+}
+function trySetup(k){ setPreset(k); start(); }
+const ACT = {
+  a: {
+    title: "The bare bar",
+    html: function(){ return '<ol>' +
+      '<li>Press <b>Set up part a</b>. Both masses go in the tray, so only the bar is on the rod.</li>' +
+      '<li>Press <b>Start twisting</b>. Your fingers twist the rod one way, then the other, with the same twist each time.</li>' +
+      '<li>Watch how far the bar swings each time the twist changes direction. How easy is it to turn?</li>' +
+      '</ol><p>The shaded wedge shows how far the bar swings. The swing record keeps this run so you can compare later ones with it.</p>'; },
+    buttons: [["Set up part a", function(){ trySetup("none"); }]]
+  },
+  b: {
+    title: "Predict: masses near the middle",
+    html: function(){ return predBlock("b", "Suppose you bolt both masses into the holes closest to the rod and twist exactly as before. Will the bar be easier to turn, harder to turn, or about the same?"); },
+    buttons: []
+  },
+  c: {
+    title: "Try it: masses near the middle",
+    html: function(){ return '<ol>' +
+      '<li>Press <b>Set up part c</b>. Both masses bolt into the holes closest to the rod, and the twisting starts.</li>' +
+      '<li>Compare the swing with the bare bar. The swing record shows both runs on the same scale.</li>' +
+      '<li>With the same twist, is it easier or harder to get the bar moving? Is the rotational inertia larger or smaller with the masses on?</li>' +
+      '</ol>' + yourPred("b"); },
+    buttons: [["Set up part c", function(){ trySetup("near"); }]]
+  },
+  d: {
+    title: "Predict: masses far out",
+    html: function(){ return predBlock("d", "Now suppose you move the same two masses to the holes farthest from the rod and twist exactly as before. Compared with masses near the middle, will the bar be easier to turn, harder to turn, or about the same? Will its rotational inertia change?"); },
+    buttons: []
+  },
+  e: {
+    title: "Try it: masses far out",
+    html: function(){ return '<ol>' +
+      '<li>Press <b>Set up part e</b>. The masses move to the holes farthest from the rod, and the twisting starts.</li>' +
+      '<li>Compare the swing with the two setups you already tried.</li>' +
+      '<li>Press <b>Compare three</b> at the top to watch all three setups get the same twist side by side.</li>' +
+      '<li>What does moving the masses outward do to the rotational inertia? Explain what you see.</li>' +
+      '</ol>' + yourPred("d") +
+      '<p>Want more? Back in <b>One bar</b>, drag the masses to other holes, try a single mass, or choose a different mass size, and watch the swing record.</p>'; },
+    buttons: [["Set up part e", function(){ trySetup("far"); }], ["Compare three", function(){ setView("compare"); start(); }]]
+  }
+};
+function showPart(k){
+  S.part = k;
+  const nav = document.getElementById("actnav");
+  Array.prototype.forEach.call(nav.children, function(b){ b.setAttribute("aria-pressed", String(b.dataset.part === k)); });
+  const p = ACT[k], body = document.getElementById("actbody");
+  body.innerHTML = '<h3>Part ' + k + ': ' + p.title + '</h3>' + p.html();
+  if (p.buttons.length){
+    const row = document.createElement("div"); row.className = "btnrow"; row.style.marginTop = "8px";
+    p.buttons.forEach(function(b, i){
+      const btn = document.createElement("button");
+      btn.className = "btn" + (i === 0 ? " primary" : ""); btn.textContent = b[0];
+      btn.addEventListener("click", b[1]);
+      row.appendChild(btn);
+    });
+    body.appendChild(row);
+  }
+  Array.prototype.forEach.call(body.querySelectorAll("[data-pred]"), function(b){
+    b.addEventListener("click", function(){ S.pred[b.dataset.pred] = b.dataset.val; showPart(k); });
+  });
+}
+(function(){
+  const nav = document.getElementById("actnav");
+  Object.keys(ACT).forEach(function(k){
+    const b = document.createElement("button");
+    b.textContent = k; b.dataset.part = k; b.setAttribute("aria-pressed", "false");
+    b.setAttribute("aria-label", "Part " + k);
+    b.addEventListener("click", function(){ showPart(k); });
+    nav.appendChild(b);
+  });
+})();
+
+/* ------------------------------------------------------------------ boot */
+
+setView("single");
+showPart("a");
+
+/* test hook for automated checks; harmless in the page */
+window.__rotI = {S:S, P:P, CFG:CFG, inertia:inertia, swing:swing, swingDeg:swingDeg, thetaAt:thetaAt, omegaAt:omegaAt,
+  twistSign:twistSign, cfgNow:cfgNow, cfgKey:cfgKey, cfgLabel:cfgLabel, swingWords:swingWords, holeFor:holeFor, placeMass:placeMass,
+  setPreset:setPreset, setView:setView, start:start, stop:stop, showPart:showPart, renderAll:renderAll, ST:ST};
+</script>
+</body>
+</html>
