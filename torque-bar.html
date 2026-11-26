@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torque Bar</title>
+<style>
+  :root{
+    color-scheme: light;
+    --surface-1:#ffffff; --plane:#f9f9f9;
+    --text-1:#191919; --text-2:#666666;
+    --grid:#e7e7e7; --axis:#c2c2c2; --border:rgba(11,11,11,0.10);
+    --ccw:#257de0;           /* counterclockwise torque (+) */
+    --cw:#ec4647;            /* clockwise torque (-) */
+    --neutral:#9c9c9c;
+    --good:#0aac23;
+    --bar:#6b6b6b; --barface:#d9d9d9;
+    --mass:#7a5c2e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --surface-1:#191919; --plane:#0b0b0b;
+      --text-1:#efefef; --text-2:#9c9c9c;
+      --grid:#303030; --axis:#474747; --border:rgba(255,255,255,0.10);
+      --ccw:#338ced; --cw:#eb6263; --neutral:#777777;
+      --good:#0aac23; --bar:#8a8a8a; --barface:#3a3a3a; --mass:#b48a4a;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-1:#191919; --plane:#0b0b0b;
+    --text-1:#efefef; --text-2:#9c9c9c;
+    --grid:#303030; --axis:#474747; --border:rgba(255,255,255,0.10);
+    --ccw:#338ced; --cw:#eb6263; --neutral:#777777;
+    --good:#0aac23; --bar:#8a8a8a; --barface:#3a3a3a; --mass:#b48a4a;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--plane); color:var(--text-1);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-size:15px; line-height:1.45;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:6px}
+  h1{font-size:22px;margin:0;font-weight:600;letter-spacing:-0.01em}
+  .sub{color:var(--text-2);font-size:14px;margin:2px 0 0}
+  .spacer{flex:1}
+
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--surface-1)}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--text-2);font:inherit;font-size:13.5px;padding:7px 14px;cursor:pointer}
+  .seg button+button{border-left:1px solid var(--border)}
+  .seg button[aria-pressed="true"]{background:var(--text-1);color:var(--surface-1)}
+
+  .grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;margin-top:14px}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-2);margin:0 0 10px;font-weight:600}
+  .stack > .card + .card{margin-top:16px}
+
+  svg.stage{width:100%;height:auto;display:block;touch-action:none}
+
+  .verdict{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;min-height:26px}
+  .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+  .verdict strong{font-weight:600}
+
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:right;padding:6px 7px;border-bottom:1px solid var(--grid);white-space:nowrap}
+  th{color:var(--text-2);font-weight:600;font-size:12px;letter-spacing:0.02em}
+  th:first-child,td:first-child{text-align:left}
+  tbody tr:last-child td{border-bottom:0}
+  tfoot td{border-top:2px solid var(--axis);border-bottom:0;font-weight:600;padding-top:8px}
+  .swatch{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;vertical-align:baseline}
+
+  .meter{border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:9px;background:var(--plane)}
+  .meter.locked{opacity:0.72}
+  .mhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .mname{font-weight:600;font-size:14px}
+  .mtag{font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+  .mrow{display:grid;grid-template-columns:74px 1fr 66px;gap:8px;align-items:center;margin-bottom:6px}
+  .mrow label{font-size:12.5px;color:var(--text-2)}
+  input[type=range]{width:100%;accent-color:var(--ccw)}
+  input[type=number]{
+    width:100%;font:inherit;font-size:13px;padding:3px 5px;text-align:right;
+    background:var(--surface-1);color:var(--text-1);
+    border:1px solid var(--border);border-radius:6px;font-variant-numeric:tabular-nums;
+  }
+  .btn{appearance:none;font:inherit;font-size:13px;padding:6px 11px;border-radius:8px;cursor:pointer;border:1px solid var(--border);background:var(--surface-1);color:var(--text-1)}
+  .btn:hover{background:var(--plane)}
+  .btn.primary{background:var(--text-1);color:var(--surface-1);border-color:var(--text-1)}
+  .btn.icon{padding:3px 8px;font-size:15px;line-height:1.2}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+
+  .settings{display:grid;grid-template-columns:1fr 1fr;gap:9px;font-size:13px}
+  .settings label{display:block;color:var(--text-2);font-size:12px;margin-bottom:2px}
+  select{font:inherit;font-size:13px;padding:4px 6px;border-radius:7px;background:var(--surface-1);color:var(--text-1);border:1px solid var(--border);width:100%}
+  .check{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-1);margin-top:7px}
+  .check input{accent-color:var(--ccw)}
+
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--text-2);margin-bottom:9px;flex-wrap:wrap}
+  .trow{display:grid;grid-template-columns:76px 1fr;align-items:center;gap:8px;height:28px}
+  .trow:hover{background:var(--plane)}
+  .tlabel{font-size:12.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tplot{position:relative;height:100%}
+  .tcenter{position:absolute;left:50%;top:3px;bottom:3px;width:1px;background:var(--axis)}
+  .tbar{position:absolute;top:8px;height:12px}
+  .tbar.pos{left:calc(50% + 1px);background:var(--ccw);border-radius:0 4px 4px 0}
+  .tbar.neg{right:calc(50% + 1px);background:var(--cw);border-radius:4px 0 0 4px}
+  .tbar.zero{left:calc(50% - 3px);width:6px;background:var(--neutral);border-radius:3px}
+  .tval{position:absolute;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .trow.net{border-top:2px solid var(--axis);height:34px;margin-top:4px}
+  .trow.net .tlabel,.trow.net .tval{color:var(--text-1);font-weight:600}
+
+  .howto details{border-top:1px solid var(--border);padding:7px 0}
+  .howto details:first-of-type{border-top:none}
+  .howto summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-1)}
+  .howto ol{margin:7px 0 2px;padding-left:20px;font-size:13px;color:var(--text-1)}
+  .howto li{margin:3px 0}
+  .howto p{font-size:13px;color:var(--text-2);margin:6px 0 0}
+  .actnav{display:flex;gap:6px;margin:4px 0 10px;flex-wrap:wrap}
+  .actnav button{appearance:none;font:inherit;font-size:13.5px;min-width:38px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-1);cursor:pointer}
+  .actnav button[aria-pressed="true"]{background:var(--text-1);color:var(--surface-1);border-color:var(--text-1)}
+  .act h3{font-size:14px;margin:0 0 6px;color:var(--text-1)}
+  .act ol{margin:6px 0 4px;padding-left:20px;font-size:13px;color:var(--text-1)}
+  .act li{margin:4px 0}
+  .act p{font-size:13px;color:var(--text-2);margin:6px 0 0}
+  .spinread{font-size:13px;color:var(--text-1);font-variant-numeric:tabular-nums}
+  .note{font-size:12.5px;color:var(--text-2);margin:9px 0 0}
+  .formula{font-size:14px;background:var(--plane);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:10px 0 0}
+  .hint{font-size:13px;color:var(--text-2);margin-top:8px}
+  .solved{color:var(--good);font-weight:600}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  textarea.csv{width:100%;min-height:90px;font:12px ui-monospace,Menlo,Consolas,monospace;margin-top:8px;padding:6px;border-radius:7px;border:1px solid var(--border);background:var(--plane);color:var(--text-1);display:none}
+  footer{max-width:1180px;margin:0 auto;padding:0 16px 40px;color:var(--text-2);font-size:12.5px}
+  footer h3{font-size:13px;color:var(--text-1);margin:16px 0 5px}
+  footer p{margin:5px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Torque Bar</h1>
+      <p class="sub">Top view of an aluminum bar lying flat on the table, free to turn about a vertical axle at its center. Hook spring scales into the holes, pull in any direction across the table, and see which way it turns.</p>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="m-measure" aria-pressed="false" title="Like the real apparatus: readings only, no torque values">Measure</button>
+      <button id="m-analyze" aria-pressed="true" title="Shows the torque from each force">Analyze</button>
+      <button id="m-challenge" aria-pressed="false" title="Balance the bar with one adjustable scale">Challenge</button>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ---------- stage and results ---------- -->
+    <div class="stack">
+      <div class="card">
+        <svg class="stage" id="stage" viewBox="0 0 1000 560" role="application"
+             aria-label="Top view of a bar on a vertical axle with spring scales hooked into its holes. Use the controls to set each pull."></svg>
+        <div class="verdict" id="verdict"></div>
+        <div class="sr" id="live" role="status" aria-live="polite"></div>
+        <div class="btnrow" style="margin-top:8px;align-items:center">
+          <button class="btn" id="letgo">Let go of the bar</button>
+          <span class="spinread" id="spinread" aria-live="polite"></span>
+        </div>
+        <p class="note" id="draghint"></p>
+      </div>
+
+      <div class="card">
+        <h2>Data log</h2>
+        <p class="sub" style="margin:0 0 9px">Record each setup you try. Copy the log into a spreadsheet to look for the rule that decides whether the bar balances.</p>
+        <div class="btnrow">
+          <button class="btn primary" id="rec">Record this setup</button>
+          <button class="btn" id="copy">Copy as CSV</button>
+          <button class="btn" id="clearlog">Clear log</button>
+        </div>
+        <div class="scroll" style="margin-top:10px"><table id="log"></table></div>
+        <textarea class="csv" id="csvbox" readonly aria-label="Data log as CSV"></textarea>
+        <p class="hint" id="copymsg"></p>
+      </div>
+
+      <div class="card" id="analysis">
+        <h2>Torque analysis</h2>
+        <div class="scroll"><table id="tbl"></table></div>
+        <div class="formula" id="formula"></div>
+      </div>
+
+      <div class="card" id="chartcard">
+        <h2>Torque contributions</h2>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--ccw)"></span>Counterclockwise (+)</span>
+          <span><span class="swatch" style="background:var(--cw)"></span>Clockwise (&minus;)</span>
+        </div>
+        <div id="chart"></div>
+        <p class="note">The blue must match the red for the bar to balance.</p>
+      </div>
+    </div>
+
+    <!-- ---------- controls ---------- -->
+    <div class="stack">
+      <div class="card" id="challengecard" style="display:none">
+        <h2>Challenge</h2>
+        <p class="sub" id="challengetext" style="margin:0 0 9px"></p>
+        <div class="btnrow">
+          <button class="btn primary" id="check">Check balance</button>
+          <button class="btn" id="newchal">New challenge</button>
+        </div>
+        <p class="hint" id="chalresult"></p>
+      </div>
+
+      <div class="card act" id="act">
+        <h2>Activity 12.5.2: Force and lever arm combinations</h2>
+        <p class="sub" style="margin:0">Work through the parts in your Activity Guide. Each part's button sets up the bar for you.</p>
+        <div class="actnav" role="group" aria-label="Part of the activity" id="actnav"></div>
+        <div id="actbody"></div>
+        <div id="pairbox" style="display:none">
+          <div class="btnrow" style="margin-top:10px">
+            <button class="btn primary" id="pairrec">Record trial</button>
+            <button class="btn" id="pairratios" aria-pressed="false">Show ratios (part d)</button>
+            <button class="btn" id="paircopy">Copy as CSV</button>
+            <button class="btn" id="pairclear">Clear table</button>
+          </div>
+          <div class="scroll" style="margin-top:10px"><table id="pairtbl"></table></div>
+          <textarea class="csv" id="paircsv" readonly aria-label="Trial table as CSV"></textarea>
+          <p class="hint" id="pairmsg"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Forces on the bar</h2>
+        <div id="meters"></div>
+        <div class="btnrow">
+          <button class="btn" id="add">+ Spring scale</button>
+          <button class="btn" id="clear">Clear all</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Apparatus</h2>
+        <div class="settings">
+          <div>
+            <label for="preset">Preset setup</label>
+            <select id="preset">
+              <option value="">&mdash; choose &mdash;</option>
+              <option value="equal">Equal forces, equal distances</option>
+              <option value="unequal">Trade force for distance</option>
+              <option value="sameside">Both on one side</option>
+              <option value="angled">Pull at an angle</option>
+              <option value="single">One scale, pulling along the bar</option>
+              <option value="along">Pull along the bar</option>
+              <option value="three">Three forces</option>
+            </select>
+          </div>
+          <div>
+            <label for="setN">Holes per side</label>
+            <input type="number" id="setN" min="2" max="12" step="1">
+          </div>
+          <div>
+            <label for="setD">Hole spacing (cm)</label>
+            <input type="number" id="setD" min="1" max="20" step="0.5">
+          </div>
+          <div>
+            <label for="setF">Scale range (N)</label>
+            <input type="number" id="setF" min="5" max="100" step="5">
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="snap"> Snap to 15&deg; and 0.5 N when dragging</label>
+        <label class="check"><input type="checkbox" id="comp" checked> Show force components (Analyze)</label>
+      </div>
+
+      <div class="card howto" id="howto">
+        <h2>Using the app</h2>
+        <details>
+          <summary>Adding, moving and removing scales</summary>
+          <ol>
+            <li><b>+ Spring scale</b> adds a scale, up to six. You can also click an empty hole on the bar.</li>
+            <li>Change a scale's hole, force and angle with its sliders or by typing a number.</li>
+            <li>Drag the handle at the end of a scale's arrow to change its force and direction together.</li>
+            <li>The <b>&times;</b> next to a scale removes it. Setting a force to 0 N leaves the scale hooked in but pulling with no force.</li>
+          </ol>
+        </details>
+        <details>
+          <summary>Reading the angle</summary>
+          <p>Angles are measured counterclockwise, seen from above, starting from "along the bar to the right." 90&deg; pulls toward the top of the screen, &minus;90&deg; toward the bottom, and 0&deg; or 180&deg; pull along the bar.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <h3>How the apparatus works</h3>
+  <p>You are looking down on an aluminum bar that lies flat in a horizontal plane and turns about a vertical axle through its center.
+     Each spring scale hooks into a hole and pulls in any direction across the table. Readings are taken with the bar held still in
+     its starting position. The bar turns toward whichever turning effect wins and stays still only when they cancel.</p>
+  <p>Because the bar turns in a horizontal plane, gravity pulls along the axle and has no turning effect.</p>
+  <p><b>Let go of the bar</b> lets it turn freely from rest, with each pull keeping its angle to the bar. The app treats the bar
+     as a uniform 200&nbsp;g rod with no friction at the axle and stops it after two turns or four seconds. A real bar has some friction.</p>
+  <h3>The physics (Analyze mode)</h3>
+  <p>Torque about the pivot from one force: <b>&tau; = r F sin&thinsp;&theta;</b>, where <i>r</i> is the distance from the
+     pivot to the hole, <i>F</i> is the force, and <i>&theta;</i> is the angle between the lever arm (pivot&nbsp;&rarr;&nbsp;hole)
+     and the force. Only <b>F&thinsp;sin&thinsp;&theta;</b>, the part of the force perpendicular to the bar, turns it.</p>
+  <p>Counterclockwise is positive. The bar is in rotational equilibrium when <b>&Sigma;&tau; = 0</b>.</p>
+  <p>Angles: <i>&phi;</i> is the direction of the pull, measured counterclockwise (seen from above) from the direction
+     along the bar to the right. 90&deg; points toward the top of the screen and &minus;90&deg; toward the bottom; both are
+     straight across the bar.</p>
+</footer>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ model */
+
+const G = 9.8;                       // N/kg
+const NAMES = ["A","B","C","D","E","F"];
+const MAXF = 6;                      // most forces on the bar at once
+
+const S = {
+  N: 6,            // holes per side
+  d: 5,            // cm between holes
+  Fmax: 10,        // N, spring-scale range
+  mode: "analyze", // measure | analyze | challenge
+  snap: false,
+  comp: true,
+  meters: [],
+  nextId: 1,
+  hover: null,
+  challenge: null,
+  log: [],
+  trial: 0,
+  tilt: 0,         // displayed bar tilt, degrees (counterclockwise +)
+  spin: null,      // set while the bar has been let go: {alpha, t0}
+  part: null,      // current part of Activity 12.5.2
+  pairs: [],       // part c trial table
+  ratios: false
+};
+
+function mkScale(hole, F, phi, locked){
+  return {id: S.nextId++, kind: "scale", hole: hole, F: F, phi: phi, mass: 0, locked: !!locked};
+}
+function mkMass(hole, grams){
+  return {id: S.nextId++, kind: "mass", hole: hole, F: 0, phi: -90, mass: grams, locked: false};
+}
+
+function forceOf(m){ return m.kind === "mass" ? (m.mass/1000)*G : m.F; }
+function phiOf(m){ return m.kind === "mass" ? -90 : m.phi; }
+function holeX(m){ return m.hole * S.d; }                 // cm, signed
+function leverArm(m){ return Math.abs(holeX(m)); }        // cm
+function outwardDeg(m){ return m.hole < 0 ? 180 : 0; }    // direction pivot -> hole
+function wrap180(a){
+  if (a >= -180 && a <= 180) return a;
+  return ((a + 180) % 360 + 360) % 360 - 180;
+}
+function thetaOf(m){ return wrap180(phiOf(m) - outwardDeg(m)); }
+function tau(m){ return (leverArm(m)/100) * forceOf(m) * Math.sin(thetaOf(m)*Math.PI/180); }
+function fPerp(m){ return forceOf(m) * Math.sin(thetaOf(m)*Math.PI/180); }
+function netTau(){ return S.meters.reduce(function(a,m){return a + tau(m);}, 0); }
+function grossTau(){ return S.meters.reduce(function(a,m){return a + Math.abs(tau(m));}, 0); }
+function tolerance(){ return Math.max(0.005, 0.01*grossTau()); }
+function isBalanced(){ return S.meters.length > 0 && Math.abs(netTau()) <= tolerance(); }
+function nameOf(m){ return m.label || NAMES[S.meters.indexOf(m)] || "?"; }
+function behavior(){
+  if (!S.meters.length) return "no forces";
+  if (isBalanced()) return "balances";
+  return netTau() > 0 ? "turns counterclockwise" : "turns clockwise";
+}
+
+function signClass(t){ if (Math.abs(t) < 1e-9) return "zero"; return t > 0 ? "ccw" : "cw"; }
+function signColor(t){ const c = signClass(t); return c === "zero" ? "var(--neutral)" : (c === "ccw" ? "var(--ccw)" : "var(--cw)"); }
+function forceColor(m){
+  if (S.mode === "measure") return m.kind === "mass" ? "var(--mass)" : "var(--text-1)";
+  return signColor(tau(m));
+}
+
+/* -------------------------------------------------------------- geometry */
+
+const VB = {w:1000, h:560}, CX = 500, CY = 270;
+function pxPerCm(){ return 300 / (S.N * S.d); }
+function pxPerN(){ return 175 / S.Fmax; }
+function sx(xcm){ return CX + xcm*pxPerCm(); }
+
+function originOf(m){                         // hole position on the (possibly tilted) bar
+  const a = S.tilt*Math.PI/180, r = holeX(m)*pxPerCm();
+  return {x: CX + r*Math.cos(a), y: CY - r*Math.sin(a)};
+}
+function arrowLen(m){ return Math.min(forceOf(m)*pxPerN(), 230); }
+function drawPhi(m){ return phiOf(m) + (S.spin ? S.tilt : 0); }   // pull keeps its angle to the bar while it spins
+function tipOf(m){
+  const o = originOf(m), L = arrowLen(m), a = drawPhi(m)*Math.PI/180;
+  return {x: o.x + L*Math.cos(a), y: o.y - L*Math.sin(a)};
+}
+function headPoints(x, y, ux, uy, size){
+  const px = -uy, py = ux;
+  return [x + "," + y,
+    (x - ux*size + px*size*0.52) + "," + (y - uy*size + py*size*0.52),
+    (x - ux*size - px*size*0.52) + "," + (y - uy*size - py*size*0.52)].join(" ");
+}
+
+/* ---------------------------------------------------------------- render */
+
+const stage = document.getElementById("stage");
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs){
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+function txt(x, y, s, attrs){
+  const t = el("text", Object.assign({x:x, y:y, fill:"var(--text-2)", "font-size":"11.5", "font-family":"inherit", "text-anchor":"middle"}, attrs||{}));
+  t.textContent = s; return t;
+}
+
+function drawStage(){
+  while (stage.firstChild) stage.removeChild(stage.firstChild);
+  const ppc = pxPerCm(), halfPx = S.N*S.d*ppc;
+
+  // top view: label, and a faint outline of the bar's starting position when it has turned
+  stage.appendChild(txt(20, 26, "Top view, looking down on the table", {"text-anchor":"start", "font-size":"12.5"}));
+  stage.appendChild(txt(20, 43, "The axle at the center is vertical (out of the screen).", {"text-anchor":"start", "font-size":"11"}));
+  if (Math.abs(S.tilt) > 0.3){
+    stage.appendChild(el("rect", {x:CX-halfPx-16, y:CY-9, width:2*halfPx+32, height:18, rx:5,
+      fill:"none", stroke:"var(--axis)", "stroke-width":1.2, "stroke-dasharray":"5 4"}));
+  }
+
+  // tilting bar group
+  const g = el("g", {transform: "rotate(" + (-S.tilt) + " " + CX + " " + CY + ")"});
+  g.appendChild(el("rect", {x:CX-halfPx-16, y:CY-9, width:2*halfPx+32, height:18, rx:5, fill:"var(--barface)", stroke:"var(--bar)", "stroke-width":1.5}));
+  for (let n = -S.N; n <= S.N; n++){
+    const x = sx(n*S.d);
+    const taken = S.meters.some(function(m){return m.hole === n;});
+    const c = el("circle", {cx:x, cy:CY, r:4.6, fill: taken ? "var(--bar)" : "var(--surface-1)", stroke:"var(--bar)", "stroke-width":1.4, style:"cursor:pointer"});
+    const title = el("title", {}); title.textContent = "Hole " + n + " (" + Math.abs(n*S.d) + " cm from pivot). Click to add a spring scale.";
+    c.appendChild(title);
+    c.addEventListener("click", function(){ addAt(n, "scale"); });
+    g.appendChild(c);
+  }
+  // vertical axle seen end-on: a ring with a dot
+  g.appendChild(el("circle", {cx:CX, cy:CY, r:7.5, fill:"var(--surface-1)", stroke:"var(--bar)", "stroke-width":2.5}));
+  g.appendChild(el("circle", {cx:CX, cy:CY, r:2.4, fill:"var(--bar)"}));
+  stage.appendChild(g);
+
+  // ruler under the bar (level reference)
+  for (let n = -S.N; n <= S.N; n++){
+    if (n === 0) continue;
+    stage.appendChild(txt(sx(n*S.d), CY+44, String(n)));
+    stage.appendChild(txt(sx(n*S.d), CY+59, Math.abs(n*S.d) + " cm", {"font-size":"10"}));
+  }
+  stage.appendChild(txt(CX, CY+82, "hole number and distance from the axle"));
+
+  // components and lever arms (Analyze/Challenge only)
+  if (S.mode !== "measure" && !S.spin){
+    if (S.comp){
+      S.meters.forEach(function(m){
+        if (forceOf(m) <= 0.001 || m.hole === 0) return;
+        const o = originOf(m), t = tipOf(m);
+        stage.appendChild(el("line", {x1:o.x, y1:o.y, x2:t.x, y2:o.y, stroke:"var(--neutral)", "stroke-width":1.5, "stroke-dasharray":"4 3"}));
+        stage.appendChild(el("line", {x1:t.x, y1:o.y, x2:t.x, y2:t.y, stroke:signColor(tau(m)), "stroke-width":1.5, "stroke-dasharray":"4 3"}));
+      });
+    }
+    S.meters.forEach(function(m){
+      if (m.hole === 0) return;
+      stage.appendChild(el("line", {x1:CX, y1:CY-18, x2:sx(holeX(m)), y2:CY-18, stroke:"var(--axis)", "stroke-width":1, "stroke-dasharray":"2 3"}));
+    });
+  }
+
+  // forces
+  S.meters.forEach(function(m){
+    const o = originOf(m), col = forceColor(m), hot = (S.hover === m.id);
+    const L = arrowLen(m), tip = tipOf(m), a = drawPhi(m)*Math.PI/180;
+    const ux = Math.cos(a), uy = -Math.sin(a);
+
+    if (m.kind === "mass"){
+      // string and a slotted-mass block
+      const bw = 16 + Math.min(26, m.mass/25), bh = 12 + Math.min(30, m.mass/20);
+      const sl = 100;                       // long string so the mass hangs below the ruler
+      stage.appendChild(el("line", {x1:o.x, y1:o.y, x2:o.x, y2:o.y+sl, stroke:"var(--text-2)", "stroke-width":1.4}));
+      const blk = el("rect", {x:o.x-bw/2, y:o.y+sl, width:bw, height:bh, rx:3, fill:"var(--mass)", opacity:0.85, class:"handle", style:"cursor:pointer"});
+      blk.dataset.id = m.id;
+      stage.appendChild(blk);
+      stage.appendChild(txt(o.x, o.y+sl+bh+15, m.mass + " g", {fill:"var(--text-1)", "font-size":"12.5", "font-weight":"600"}));
+      if (S.mode !== "measure"){
+        // weight vector, drawn beside the string
+        if (L > 2){
+          stage.appendChild(el("line", {x1:o.x+bw/2+8, y1:o.y, x2:o.x+bw/2+8, y2:o.y+Math.max(0,L-11), stroke:col, "stroke-width":3, "stroke-linecap":"round"}));
+          stage.appendChild(el("polygon", {points: headPoints(o.x+bw/2+8, o.y+L, 0, 1, 13), fill: col}));
+        }
+        stage.appendChild(txt(o.x+bw/2+22, o.y+16, nameOf(m), {fill:"var(--text-1)", "font-size":"13", "font-weight":"600", "text-anchor":"start"}));
+      } else {
+        stage.appendChild(txt(o.x+bw/2+10, o.y+sl+10, nameOf(m), {fill:"var(--text-1)", "font-size":"13", "font-weight":"600", "text-anchor":"start"}));
+      }
+      return;
+    }
+
+    // spring scale: arrow along the pull plus a draggable handle
+    if (L > 2){
+      const shaftLen = Math.max(0, L-11);
+      stage.appendChild(el("line", {x1:o.x, y1:o.y, x2:o.x+ux*shaftLen, y2:o.y+uy*shaftLen, stroke:col, "stroke-width": hot ? 5 : 3.4, "stroke-linecap":"round"}));
+      stage.appendChild(el("polygon", {points: headPoints(tip.x, tip.y, ux, uy, 15), fill: col}));
+    }
+    const hx = L > 2 ? tip.x : o.x, hy = L > 2 ? tip.y : o.y;
+    const h = el("circle", {cx:hx, cy:hy, r: hot ? 11 : 9, fill:"var(--surface-1)", stroke:col, "stroke-width":2.5, style: m.locked ? "cursor:not-allowed" : "cursor:grab", class:"handle"});
+    h.dataset.id = m.id;
+    stage.appendChild(h);
+
+    // scale reading, like the dial on the real meter: placed beyond the handle along the pull,
+    // with every other label pushed farther out so neighbours don't collide
+    const idx = S.meters.indexOf(m);
+    const dist = 26 + (idx % 2)*30;
+    const bx = (L > 2 ? ux : 0), by = (L > 2 ? uy : -1);
+    const cxL = hx + bx*dist, cyL = hy + by*dist + (by > 0.3 ? 6 : 0);
+    stage.appendChild(txt(cxL, cyL - 4, nameOf(m), {fill:"var(--text-1)", "font-size":"13", "font-weight":"600"}));
+    stage.appendChild(txt(cxL, cyL + 11, forceOf(m).toFixed(1) + " N, " + Math.round(phiOf(m)) + "°", {fill:"var(--text-2)", "font-size":"11.5"}));
+  });
+
+  // net torque arc (Analyze/Challenge)
+  const net = netTau(), gross = grossTau();
+  if (S.mode !== "measure" && S.meters.length && Math.abs(net) > tolerance() && gross > 0){
+    const frac = Math.min(1, Math.abs(net)/gross);
+    const sweep = 34 + 116*frac, r = 86, col = signColor(net), ccw = net > 0;
+    const a0 = 90 - sweep/2, a1 = 90 + sweep/2;
+    const p0 = {x: CX + r*Math.cos(a0*Math.PI/180), y: CY - r*Math.sin(a0*Math.PI/180)};
+    const p1 = {x: CX + r*Math.cos(a1*Math.PI/180), y: CY - r*Math.sin(a1*Math.PI/180)};
+    const from = ccw ? p0 : p1, to = ccw ? p1 : p0;
+    stage.appendChild(el("path", {d:"M "+from.x+" "+from.y+" A "+r+" "+r+" 0 0 "+(ccw?0:1)+" "+to.x+" "+to.y, fill:"none", stroke:col, "stroke-width":3.4}));
+    const aEnd = (ccw ? a1 : a0)*Math.PI/180;
+    const tx = -Math.sin(aEnd)*(ccw?1:-1), ty = -Math.cos(aEnd)*(ccw?1:-1);
+    stage.appendChild(el("polygon", {points: headPoints(to.x, to.y, tx, ty, 14), fill: col}));
+  }
+}
+
+function drawVerdict(){
+  const v = document.getElementById("verdict"), live = document.getElementById("live");
+  v.innerHTML = "";
+  if (!S.meters.length){
+    v.innerHTML = '<span style="color:var(--text-2)">No forces on the bar.</span>';
+    live.textContent = "No forces on the bar."; return;
+  }
+  const net = netTau(), bal = isBalanced();
+  const col = bal ? "var(--good)" : (S.mode === "measure" ? "var(--text-2)" : signColor(net));
+  const msg = bal ? "Balanced: the bar doesn't turn" : "Not balanced: let go and the bar turns " + (net > 0 ? "counterclockwise" : "clockwise") + " (seen from above)";
+  const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = col;
+  const t = document.createElement("span");
+  t.innerHTML = "<strong>" + msg + "</strong>" + (S.mode === "measure" ? "" :
+    ' <span style="color:var(--text-2)">&nbsp;&Sigma;&tau; = ' + net.toFixed(3) + " N&middot;m</span>");
+  v.appendChild(dot); v.appendChild(t);
+  live.textContent = msg + (S.mode === "measure" ? "" : ", net torque " + net.toFixed(3) + " newton metres");
+}
+
+function drawTable(){
+  const show = (S.mode !== "measure");
+  document.getElementById("analysis").style.display = show ? "" : "none";
+  document.getElementById("chartcard").style.display = show ? "" : "none";
+  if (!show) return;
+  const tbl = document.getElementById("tbl");
+  let h = "<thead><tr><th>Force</th><th>Hole</th><th>r (cm)</th><th>F (N)</th><th>&phi; (&deg;)</th>" +
+          "<th>&theta; (&deg;)</th><th>F sin&thinsp;&theta; (N)</th><th>&tau; (N&middot;m)</th></tr></thead><tbody>";
+  S.meters.forEach(function(m){
+    const t = tau(m);
+    h += "<tr data-id='" + m.id + "'><td><span class='swatch' style='background:" + signColor(t) + "'></span>" + nameOf(m) +
+      (m.kind === "mass" ? " <span style='color:var(--text-2)'>(" + m.mass + " g)</span>" : "") + "</td>" +
+      "<td>" + m.hole + "</td><td>" + leverArm(m).toFixed(1) + "</td><td>" + forceOf(m).toFixed(2) + "</td>" +
+      "<td>" + Math.round(phiOf(m)) + "</td><td>" + (m.hole === 0 ? "&mdash;" : Math.round(thetaOf(m))) + "</td>" +
+      "<td>" + fPerp(m).toFixed(2) + "</td><td>" + t.toFixed(3) + "</td></tr>";
+  });
+  h += "</tbody><tfoot><tr><td colspan='7'>Net torque &nbsp;&Sigma;&tau;</td><td>" + netTau().toFixed(3) + "</td></tr></tfoot>";
+  tbl.innerHTML = h;
+  Array.prototype.forEach.call(tbl.querySelectorAll("tbody tr"), function(tr){
+    tr.addEventListener("mouseenter", function(){ S.hover = +tr.dataset.id; drawStage(); });
+    tr.addEventListener("mouseleave", function(){ S.hover = null; drawStage(); });
+  });
+  document.getElementById("formula").innerHTML =
+    "&tau; = r F sin&thinsp;&theta; &nbsp;&middot;&nbsp; counterclockwise positive &nbsp;&middot;&nbsp; " +
+    "&phi; measured from horizontal-right; &theta; from the lever arm (pivot &rarr; hole)";
+}
+
+function drawChart(){
+  if (S.mode === "measure") return;
+  const box = document.getElementById("chart"), net = netTau();
+  let maxAbs = Math.abs(net);
+  S.meters.forEach(function(m){ maxAbs = Math.max(maxAbs, Math.abs(tau(m))); });
+  if (maxAbs < 1e-6) maxAbs = 1;
+  function row(label, val, id, isNet){
+    const w = (Math.min(1, Math.abs(val)/maxAbs)*49).toFixed(2), cls = signClass(val);
+    const bar = cls === "zero" ? '<div class="tbar zero"></div>' :
+      '<div class="tbar ' + (cls === "ccw" ? "pos" : "neg") + '" style="width:' + w + '%"></div>';
+    const side = cls === "ccw" ? 'left:calc(50% + ' + w + '% + 8px)' :
+      (cls === "cw" ? 'right:calc(50% + ' + w + '% + 8px)' : 'left:calc(50% + 10px)');
+    return '<div class="trow' + (isNet ? ' net' : '') + '"' + (id ? ' data-id="' + id + '"' : '') + '>' +
+      '<div class="tlabel">' + label + '</div><div class="tplot"><div class="tcenter"></div>' + bar +
+      '<div class="tval" style="' + side + '">' + val.toFixed(3) + '</div></div></div>';
+  }
+  let h = "";
+  S.meters.forEach(function(m){ h += row("Force " + nameOf(m), tau(m), m.id, false); });
+  h += row("Net", net, null, true);
+  box.innerHTML = h;
+  Array.prototype.forEach.call(box.querySelectorAll(".trow[data-id]"), function(r){
+    r.addEventListener("mouseenter", function(){ S.hover = +r.dataset.id; drawStage(); });
+    r.addEventListener("mouseleave", function(){ S.hover = null; drawStage(); });
+  });
+}
+
+function rowHTML(m, k, label, min, max, step, val, disp, dis){
+  return '<div class="mrow"><label for="' + k + m.id + '">' + label + '</label>' +
+    '<input type="range" id="' + k + m.id + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '" data-k="' + k + '" data-id="' + m.id + '"' + dis + '>' +
+    '<input type="number" min="' + min + '" max="' + max + '" step="' + step + '" value="' + disp + '" data-k="' + k + '" data-id="' + m.id + '"' + dis + ' aria-label="' + label + '"></div>';
+}
+
+function drawMeters(){
+  const box = document.getElementById("meters");
+  box.innerHTML = "";
+  if (!S.meters.length) box.innerHTML = '<p class="sub" style="margin:0 0 8px">Click a hole on the bar, or add a spring scale or a hanging mass.</p>';
+  S.meters.forEach(function(m){
+    const d = document.createElement("div");
+    d.className = "meter" + (m.locked ? " locked" : "");
+    const dis = m.locked ? " disabled" : "";
+    const sw = S.mode === "measure" ? forceColor(m) : signColor(tau(m));
+    let h = '<div class="mhead"><span class="swatch" data-sw="' + m.id + '" style="background:' + sw + '"></span>' +
+      '<span class="mname">' + nameOf(m) + ': ' + (m.kind === "mass" ? "hanging mass" : "spring scale") + '</span>' +
+      (m.locked ? '<span class="mtag">fixed</span>' : '') + '<span style="flex:1"></span>' +
+      (m.locked ? '' : '<button class="btn icon" data-del="' + m.id + '" aria-label="Remove ' + nameOf(m) + '">&times;</button>') + '</div>';
+    h += rowHTML(m, "hole", "Hole", -S.N, S.N, 1, m.hole, m.hole, dis);
+    if (m.kind === "mass"){
+      h += rowHTML(m, "mass", "Mass (g)", 0, 1000, 10, m.mass, m.mass, dis);
+      h += '<p class="note" style="margin:2px 0 0">Weight = ' + forceOf(m).toFixed(2) + ' N, straight down.</p>';
+    } else {
+      h += rowHTML(m, "F", "Force (N)", 0, S.Fmax, 0.1, m.F, m.F.toFixed(1), dis);
+      h += rowHTML(m, "phi", "Angle &phi; (&deg;)", -180, 180, 1, Math.round(m.phi), Math.round(m.phi), dis);
+    }
+    d.innerHTML = h;
+    box.appendChild(d);
+  });
+  Array.prototype.forEach.call(box.querySelectorAll("input[data-k]"), function(inp){
+    inp.addEventListener("input", function(){
+      const m = S.meters.find(function(x){return x.id === +inp.dataset.id;});
+      if (!m) return;
+      const v = parseFloat(inp.value); if (isNaN(v)) return;
+      const k = inp.dataset.k;
+      if (k === "hole") m.hole = Math.max(-S.N, Math.min(S.N, Math.round(v)));
+      if (k === "F")    m.F    = Math.max(0, Math.min(S.Fmax, v));
+      if (k === "phi")  m.phi  = wrap180(v);
+      if (k === "mass") m.mass = Math.max(0, Math.min(1000, Math.round(v)));
+      // keep the twin control in step without rebuilding (so dragging a slider keeps focus)
+      Array.prototype.forEach.call(box.querySelectorAll('input[data-k="' + k + '"][data-id="' + m.id + '"]'), function(o){
+        if (o !== inp) o.value = (k === "F") ? m.F.toFixed(1) : (k === "phi" ? Math.round(m.phi) : (k === "hole" ? m.hole : m.mass));
+      });
+      renderLight();
+    });
+  });
+  Array.prototype.forEach.call(box.querySelectorAll("[data-del]"), function(b){
+    b.addEventListener("click", function(){
+      S.meters = S.meters.filter(function(x){return x.id !== +b.dataset.del;});
+      render();
+    });
+  });
+}
+
+/* ---------------------------------------------------------------- log */
+
+function logHeaders(){
+  const base = ["Trial","Force","Type","Hole","r (cm)","F (N)","phi (deg)","Bar"];
+  return S.mode === "measure" ? base : base.concat(["theta (deg)","F sin theta (N)","tau (N m)"]);
+}
+function drawLog(){
+  const t = document.getElementById("log");
+  if (!S.log.length){ t.innerHTML = '<tbody><tr><td style="color:var(--text-2)">Nothing recorded yet.</td></tr></tbody>'; return; }
+  const hs = logHeaders();
+  let h = "<thead><tr>" + hs.map(function(x){return "<th>" + x + "</th>";}).join("") + "</tr></thead><tbody>";
+  S.log.forEach(function(r){
+    const cells = [r.trial, r.name, r.type, r.hole, r.r.toFixed(1), r.F.toFixed(2), r.phi, r.bar];
+    const more = S.mode === "measure" ? [] : [r.theta, r.fperp.toFixed(2), r.tau.toFixed(3)];
+    h += "<tr>" + cells.concat(more).map(function(c){return "<td>" + c + "</td>";}).join("") + "</tr>";
+  });
+  t.innerHTML = h + "</tbody>";
+}
+function recordSetup(){
+  if (!S.meters.length) return;
+  S.trial += 1;
+  const bar = behavior();
+  S.meters.forEach(function(m){
+    S.log.push({trial:S.trial, name:nameOf(m), type: m.kind === "mass" ? "mass " + m.mass + " g" : "scale",
+      hole:m.hole, r:leverArm(m), F:forceOf(m), phi:Math.round(phiOf(m)),
+      theta: m.hole === 0 ? "" : Math.round(thetaOf(m)), fperp:fPerp(m), tau:tau(m), bar:bar});
+  });
+  drawLog();
+  document.getElementById("copymsg").textContent = "Recorded trial " + S.trial + ".";
+}
+function csvText(){
+  const hs = logHeaders();
+  const lines = [hs.join(",")];
+  S.log.forEach(function(r){
+    const cells = [r.trial, r.name, '"' + r.type + '"', r.hole, r.r.toFixed(1), r.F.toFixed(2), r.phi, '"' + r.bar + '"'];
+    const more = S.mode === "measure" ? [] : [r.theta, r.fperp.toFixed(3), r.tau.toFixed(4)];
+    lines.push(cells.concat(more).join(","));
+  });
+  return lines.join("\n");
+}
+document.getElementById("rec").addEventListener("click", recordSetup);
+document.getElementById("clearlog").addEventListener("click", function(){
+  S.log = []; S.trial = 0; drawLog();
+  document.getElementById("csvbox").style.display = "none";
+  document.getElementById("copymsg").textContent = "";
+});
+document.getElementById("copy").addEventListener("click", function(){
+  const msg = document.getElementById("copymsg"), box = document.getElementById("csvbox");
+  if (!S.log.length){ msg.textContent = "Record a setup first."; return; }
+  const text = csvText();
+  box.value = text;
+  function fallback(){
+    box.style.display = "block"; box.focus(); box.select();
+    msg.textContent = "Select the text above and copy it (Ctrl+C or ⌘C).";
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){
+        box.style.display = "none";
+        msg.textContent = "Copied " + S.log.length + " rows. Paste into a spreadsheet.";
+      }, fallback);
+    } else fallback();
+  } catch(e){ fallback(); }
+});
+
+/* ------------------------------------------------------- tilt animation */
+
+let animId = null;
+function targetTilt(){ return 0; }            // the bar is held level until "Let go of the bar"
+function animate(){
+  const target = targetTilt(), diff = target - S.tilt;
+  if (Math.abs(diff) < 0.05){ S.tilt = target; drawStage(); animId = null; return; }
+  S.tilt += diff * 0.18;
+  drawStage();
+  animId = requestAnimationFrame(animate);
+}
+function startTilt(){
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || drag !== null){ S.tilt = (drag !== null) ? S.tilt : targetTilt(); drawStage(); return; }
+  if (animId === null) animId = requestAnimationFrame(animate);
+}
+
+function drawSwatches(){
+  S.meters.forEach(function(m){
+    const s = document.querySelector('[data-sw="' + m.id + '"]');
+    if (s) s.style.background = S.mode === "measure" ? forceColor(m) : signColor(tau(m));
+  });
+}
+function renderLight(){ stopSpin(); drawStage(); drawVerdict(); drawTable(); drawChart(); drawSwatches(); startTilt(); }
+function render(){ drawMeters(); renderLight(); drawLog(); }
+
+/* ------------------------------------------------------------- dragging */
+
+let drag = null;
+stage.addEventListener("pointerdown", function(ev){
+  const t = ev.target;
+  if (!t.classList || !t.classList.contains("handle")) return;
+  const m = S.meters.find(function(x){return x.id === +t.dataset.id;});
+  if (!m || m.locked || m.kind === "mass") return;
+  stopSpin();
+  drag = m.id; S.hover = m.id;
+  stage.setPointerCapture(ev.pointerId);
+  ev.preventDefault();
+});
+stage.addEventListener("pointermove", function(ev){
+  if (drag === null) return;
+  const m = S.meters.find(function(x){return x.id === drag;});
+  if (!m) return;
+  const r = stage.getBoundingClientRect();
+  const px = (ev.clientX - r.left) * (VB.w / r.width);
+  const py = (ev.clientY - r.top) * (VB.h / r.height);
+  const o = originOf(m);
+  const dx = px - o.x, dy = o.y - py;
+  let phi = Math.atan2(dy, dx)*180/Math.PI;
+  let F = Math.hypot(dx, dy) / pxPerN();
+  if (S.snap){ phi = Math.round(phi/15)*15; F = Math.round(F*2)/2; }
+  m.phi = wrap180(phi);
+  m.F = Math.max(0, Math.min(S.Fmax, F));
+  drawStage(); drawVerdict(); drawTable(); drawChart(); drawSwatches();
+});
+function endDrag(){ if (drag !== null){ drag = null; S.hover = null; render(); } }
+stage.addEventListener("pointerup", endDrag);
+stage.addEventListener("pointercancel", endDrag);
+
+/* -------------------------------------------------------------- actions */
+
+function addAt(n, kind){
+  if (S.meters.length >= MAXF) return;
+  if (S.meters.some(function(m){return m.hole === n;})) return;
+  S.meters.push(kind === "mass" ? mkMass(n, 200) : mkScale(n, Math.round(S.Fmax*0.3*10)/10, 90, false));
+  render();
+}
+function firstFree(fromRight){
+  for (let i = 0; i <= 2*S.N; i++){
+    const n = fromRight ? S.N - i : -S.N + i;
+    if (n !== 0 && !S.meters.some(function(m){return m.hole === n;})) return n;
+  }
+  return null;
+}
+document.getElementById("add").addEventListener("click", function(){ const n = firstFree(true); if (n !== null) addAt(n, "scale"); });
+document.getElementById("clear").addEventListener("click", function(){
+  S.meters = []; S.challenge = null;
+  if (S.mode === "challenge") setMode("analyze"); else render();
+});
+
+/* ---------------------------------------------------------------- modes */
+
+const HINTS = {
+  measure:   "Like the real apparatus: you see the scale readings, distances and angles, and which way the bar turns. Record each setup in the data log.",
+  analyze:   "Drag an arrowhead to change a pull. Click a hole to add a spring scale there.",
+  challenge: "Adjust only the scale that isn't fixed until the bar doesn't turn."
+};
+function setMode(mode){
+  S.mode = mode;
+  ["measure","analyze","challenge"].forEach(function(k){
+    document.getElementById("m-"+k).setAttribute("aria-pressed", String(k === mode));
+  });
+  document.getElementById("challengecard").style.display = (mode === "challenge") ? "" : "none";
+  document.getElementById("draghint").textContent = HINTS[mode];
+  if (mode === "challenge" && !S.challenge) newChallenge();
+  render();
+}
+document.getElementById("m-measure").addEventListener("click", function(){ setMode("measure"); });
+document.getElementById("m-analyze").addEventListener("click", function(){ setMode("analyze"); });
+document.getElementById("m-challenge").addEventListener("click", function(){ setMode("challenge"); });
+
+/* ------------------------------------------------------------ challenge */
+
+function randInt(a,b){ return a + Math.floor(Math.random()*(b-a+1)); }
+function pick(arr){ return arr[randInt(0, arr.length-1)]; }
+
+function newChallenge(){
+  const holes = [];
+  for (let n = -S.N; n <= S.N; n++) if (n !== 0) holes.push(n);
+  for (let tries = 0; tries < 400; tries++){
+    const h1 = pick(holes), h2 = pick(holes.filter(function(h){return h !== h1;}));
+    const fhi = Math.max(8, Math.round(S.Fmax*1.2));
+    const m1 = mkScale(h1, randInt(4,fhi)/2, pick([60,90,90,120,45,135]), true);
+    const m2 = mkScale(h2, randInt(4,fhi)/2, pick([60,90,90,120,45,135]), true);
+    const fixedTau = tau(m1) + tau(m2);
+    if (Math.abs(fixedTau) < 0.15) continue;
+    const cands = holes.filter(function(h){
+      if (h === h1 || h === h2) return false;
+      const need = Math.abs(fixedTau) / (Math.abs(h*S.d)/100);
+      return need <= S.Fmax*0.92 && need >= 0.8;
+    });
+    if (!cands.length) continue;
+    const hf = pick(cands);
+    const free = mkScale(hf, Math.round(S.Fmax*0.25*10)/10, 90, false);
+    S.meters = [m1, m2, free];
+    S.challenge = {freeId: free.id, solved: false};
+    const minF = Math.abs(fixedTau) / (Math.abs(hf*S.d)/100);
+    document.getElementById("challengetext").innerHTML =
+      "Scales <b>A</b> and <b>B</b> are fixed. Adjust scale <b>C</b> at hole <b>" + hf +
+      "</b> so the bar doesn't turn. More than one force and angle will work; the smallest force that can do it is about <b>" +
+      minF.toFixed(1) + " N</b>, pulling straight across the bar.";
+    document.getElementById("chalresult").textContent = "";
+    render();
+    return;
+  }
+  document.getElementById("challengetext").textContent = "Could not build a challenge with this apparatus. Try more holes or a wider scale range.";
+}
+document.getElementById("newchal").addEventListener("click", newChallenge);
+document.getElementById("check").addEventListener("click", function(){
+  const out = document.getElementById("chalresult");
+  if (!S.challenge){ out.textContent = ""; return; }
+  const net = netTau();
+  if (Math.abs(net) <= tolerance()){
+    S.challenge.solved = true;
+    out.innerHTML = '<span class="solved">Balanced.</span> &Sigma;&tau; = ' + net.toFixed(3) +
+      " N&middot;m. Now try a different force and angle at the same hole: balance fixes only the product r F sin&thinsp;&theta;.";
+  } else {
+    out.innerHTML = "Not yet: &Sigma;&tau; = " + net.toFixed(3) + " N&middot;m, so the bar still turns " +
+      (net > 0 ? "counterclockwise" : "clockwise") + ". You need " + (net > 0 ? "more clockwise" : "more counterclockwise") + " torque.";
+  }
+});
+
+/* --------------------------------------------------------------- presets */
+
+const PRESETS = {
+  equal:    [["s",-4,6,90],["s",4,6,90]],
+  unequal:  [["s",-2,8,90],["s",4,4,90]],
+  sameside: [["s",2,6,90],["s",5,2.4,-90]],
+  angled:   [["s",-4,4,90],["s",4,8,30]],
+  single:   [["s",6,2,0]],
+  along:    [["s",-3,5,90],["s",3,5,90],["s",5,9,0]],
+  three:    [["s",-5,4,90],["s",-2,6,120],["s",3,7,75]]
+};
+document.getElementById("preset").addEventListener("change", function(ev){
+  const p = PRESETS[ev.target.value];
+  if (!p) return;
+  S.challenge = null;
+  S.meters = p.map(function(a){ return a[0] === "m" ? mkMass(a[1], a[2]) : mkScale(a[1], a[2], a[3], false); });
+  S.meters.forEach(function(m){ m.hole = Math.max(-S.N, Math.min(S.N, m.hole)); m.F = Math.min(S.Fmax, m.F); });
+  ev.target.value = "";
+  if (S.mode === "challenge") setMode("analyze"); else render();
+});
+
+/* -------------------------------------------------------------- settings */
+
+function clampMeters(){
+  S.meters.forEach(function(m){ m.hole = Math.max(-S.N, Math.min(S.N, m.hole)); m.F = Math.max(0, Math.min(S.Fmax, m.F)); });
+}
+const setN = document.getElementById("setN"), setD = document.getElementById("setD"), setF = document.getElementById("setF");
+setN.value = S.N; setD.value = S.d; setF.value = S.Fmax;
+setN.addEventListener("change", function(){ const v = parseInt(setN.value,10); if (isNaN(v)||v<2||v>12){ setN.value = S.N; return; } S.N = v; clampMeters(); render(); });
+setD.addEventListener("change", function(){ const v = parseFloat(setD.value); if (isNaN(v)||v<1||v>20){ setD.value = S.d; return; } S.d = v; render(); });
+setF.addEventListener("change", function(){ const v = parseFloat(setF.value); if (isNaN(v)||v<5||v>100){ setF.value = S.Fmax; return; } S.Fmax = v; clampMeters(); render(); });
+document.getElementById("snap").addEventListener("change", function(e){ S.snap = e.target.checked; });
+document.getElementById("comp").addEventListener("change", function(e){ S.comp = e.target.checked; render(); });
+
+
+/* ------------------------------------------------------ letting go (spin) */
+
+const BAR_MASS = 0.2;                         // kg, assumed for the aluminum bar
+function barInertia(){                        // kg m^2, uniform rod about its center
+  const L = (2*S.N*S.d + 6)/100;
+  return BAR_MASS*L*L/12;
+}
+let spinId = null;
+function spinText(t, angDeg, omegaDeg){
+  return "After " + t.toFixed(1) + " s: turned " + Math.round(Math.abs(angDeg)) + "° " +
+    (angDeg >= 0 ? "counterclockwise" : "clockwise") + ", now turning at " + Math.round(Math.abs(omegaDeg)) + "°/s";
+}
+function stopSpin(){
+  if (!S.spin) return;
+  if (spinId !== null){ cancelAnimationFrame(spinId); spinId = null; }
+  S.spin = null; S.tilt = 0;
+  document.getElementById("letgo").textContent = "Let go of the bar";
+  document.getElementById("spinread").textContent = "";
+}
+function spinState(t){
+  const a = S.spin.alpha;                                   // rad/s^2
+  return {ang: 0.5*a*t*t*180/Math.PI, omega: a*t*180/Math.PI};
+}
+const SPIN_MAX_T = 4, SPIN_MAX_DEG = 720;
+function spinEndTime(){
+  const a = Math.abs(S.spin.alpha);
+  return Math.min(SPIN_MAX_T, Math.sqrt(2*(SPIN_MAX_DEG*Math.PI/180)/a));
+}
+function spinFrame(now){
+  if (!S.spin) return;
+  const tEnd = spinEndTime();
+  let t = (now - S.spin.t0)/1000, done = false;
+  if (t >= tEnd){ t = tEnd; done = true; }
+  const st = spinState(t);
+  S.tilt = st.ang; drawStage();
+  document.getElementById("spinread").textContent = spinText(t, st.ang, st.omega) + (done ? ". (Stopped here.)" : "");
+  if (done){ spinId = null; return; }
+  spinId = requestAnimationFrame(spinFrame);
+}
+function letGo(){
+  if (S.spin){                                // second press: catch the bar and put it back
+    stopSpin(); drawStage(); startTilt(); return;
+  }
+  const read = document.getElementById("spinread");
+  if (!S.meters.length){ read.textContent = "Hook a spring scale into the bar first."; return; }
+  if (isBalanced()){ read.textContent = "The bar stays still."; return; }
+  if (animId !== null){ cancelAnimationFrame(animId); animId = null; }
+  S.spin = {alpha: netTau()/barInertia(), t0: 0};
+  document.getElementById("letgo").textContent = "Catch the bar and reset";
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || typeof requestAnimationFrame !== "function"){
+    const t = Math.min(1, spinEndTime()), st = spinState(t);
+    S.tilt = st.ang; drawStage(); read.textContent = spinText(t, st.ang, st.omega) + ".";
+    return;
+  }
+  S.spin.t0 = performance.now();
+  S.tilt = 0; drawStage();
+  spinId = requestAnimationFrame(spinFrame);
+}
+document.getElementById("letgo").addEventListener("click", letGo);
+
+/* ------------------------------------------------- Activity 12.5.2 guide */
+
+function scaleAt(hole, F, phi, label){ const m = mkScale(hole, F, phi, false); m.label = label; return m; }
+function setupBar(meters){
+  stopSpin();
+  S.challenge = null;
+  S.meters = meters;
+  clampMeters();
+  if (S.mode === "challenge") setMode("measure"); else render();
+}
+function holeCm(n){ return Math.abs(n*S.d); }
+const ACT = {
+  a: {
+    title: "One scale: along the bar, then across it",
+    html: function(){ return '<ol>' +
+      '<li>Press <b>Set up part a</b>. Scale F1 hooks into the hole farthest from the axle (' + holeCm(S.N) + ' cm) and pulls along the bar, straight away from the axle (angle 0&deg;).</li>' +
+      '<li>Press <b>Let go of the bar</b> under the picture. What do you observe? Try a few different forces.</li>' +
+      '<li>Press <b>Pull across the bar</b>. It turns F1 to 90&deg;, perpendicular to the bar, with a very small force of 0.2 N.</li>' +
+      '<li>Press <b>Let go of the bar</b> again and watch the numbers under the picture. Is the bar turning at a steady rate, or faster and faster?</li>' +
+      '</ol><p>While the bar turns, the app keeps each pull at the same angle to the bar, as if you kept your pull perpendicular as the bar moves.</p>'; },
+    buttons: [["Set up part a", function(){ setupBar([scaleAt(S.N, 2, 0, "F1")]); }],
+              ["Pull across the bar", function(){
+                 const m = S.meters.find(function(x){ return x.label === "F1"; });
+                 if (!m){ setupBar([scaleAt(S.N, 0.2, 90, "F1")]); return; }
+                 m.phi = m.hole < 0 ? -90 : 90; m.F = 0.2; render(); }]]
+  },
+  b: {
+    title: "Two scales at equal distances",
+    html: function(){ return '<ol>' +
+      '<li>Press <b>Set up part b</b>. F1 hooks in on the right and F2 on the left, each ' + holeCm(3) + ' cm from the axle. Both pull across the bar, toward the top of the screen.</li>' +
+      '<li>Change F2&rsquo;s <b>Force</b> until the bar doesn&rsquo;t turn.</li>' +
+      '<li>What do you notice about the two readings? Try another force for F1, or another pair of holes the same distance from the axle, and balance it again.</li>' +
+      '</ol>'; },
+    buttons: [["Set up part b", function(){ setupBar([scaleAt(3, 4, 90, "F1"), scaleAt(-3, 2, 90, "F2")]); }]]
+  },
+  c: {
+    title: "Move F1 outward, keeping it at 1 N",
+    html: function(){ return '<ol>' +
+      '<li>Press <b>Set up part c</b>. Both scales start in the holes closest to the axle, and F1 (on the right) reads 1 N.</li>' +
+      '<li>Move F1 one hole farther out with its <b>Hole</b> control. Keep F1 at 1 N.</li>' +
+      '<li>Change F2&rsquo;s <b>Force</b> until the bar doesn&rsquo;t turn.</li>' +
+      '<li>Press <b>Record trial</b> to add F1, r1, F2 and r2 to the table below.</li>' +
+      '<li>Repeat for at least four trials, moving F1 farther out each time.</li>' +
+      '</ol><p>r1 and r2 are the distances from the axle to the holes where F1 and F2 pull.</p>'; },
+    buttons: [["Set up part c", function(){ setupBar([scaleAt(1, 1, 90, "F1"), scaleAt(-1, 0.5, 90, "F2")]); }]]
+  },
+  d: {
+    title: "Look for the pattern",
+    html: function(){ return '<ol>' +
+      '<li>Press <b>Show ratios (part d)</b>. The table adds F1/F2, r1/r2 and r2/r1 for each trial.</li>' +
+      '<li>Compare F1/F2 with r1/r2 and with r2/r1. Which one matches, within the precision of your readings?</li>' +
+      '</ol>'; },
+    buttons: []
+  },
+  e: {
+    title: "Turn the pattern into an equation",
+    html: function(){ return '<ol>' +
+      '<li>Write the ratios you found equal in part d as an equation, using the symbols F1, F2, r1 and r2.</li>' +
+      '<li>Multiply both sides by r1 and by F2. What quantity on the left of the axle equals a similar quantity on the right?</li>' +
+      '<li>When you have your answer, press <b>Check in Analyze mode</b>. Analyze mode shows that quantity for each scale.</li>' +
+      '</ol>'; },
+    buttons: [["Check in Analyze mode", function(){ setMode("analyze"); }]]
+  }
+};
+function showPart(k){
+  S.part = k;
+  const nav = document.getElementById("actnav");
+  Array.prototype.forEach.call(nav.children, function(b){ b.setAttribute("aria-pressed", String(b.dataset.part === k)); });
+  const p = ACT[k], body = document.getElementById("actbody");
+  body.innerHTML = '<h3>Part ' + k + ': ' + p.title + '</h3>' + p.html();
+  if (p.buttons.length){
+    const row = document.createElement("div"); row.className = "btnrow"; row.style.marginTop = "8px";
+    p.buttons.forEach(function(b, i){
+      const btn = document.createElement("button");
+      btn.className = "btn" + (i === 0 ? " primary" : ""); btn.textContent = b[0];
+      btn.addEventListener("click", b[1]);
+      row.appendChild(btn);
+    });
+    body.appendChild(row);
+  }
+  document.getElementById("pairbox").style.display = (k === "c" || k === "d" || k === "e") ? "" : "none";
+  if (k === "d" && !S.ratios) setRatios(true);
+}
+(function(){
+  const nav = document.getElementById("actnav");
+  Object.keys(ACT).forEach(function(k){
+    const b = document.createElement("button");
+    b.textContent = k; b.dataset.part = k; b.setAttribute("aria-pressed", "false");
+    b.setAttribute("aria-label", "Part " + k);
+    b.addEventListener("click", function(){ showPart(k); });
+    nav.appendChild(b);
+  });
+})();
+
+/* part c trial table */
+function fmt(x, n){ return (Math.round(x*Math.pow(10,n))/Math.pow(10,n)).toFixed(n); }
+function pairHeaders(){
+  const h = ["Trial","F1 (N)","r1 (cm)","F2 (N)","r2 (cm)"];
+  return S.ratios ? h.concat(["F1/F2","r1/r2","r2/r1"]) : h;
+}
+function pairCells(r){
+  const c = [r.trial, fmt(r.F1,1), fmt(r.r1,1), fmt(r.F2,1), fmt(r.r2,1)];
+  return S.ratios ? c.concat([r.F2 > 0 ? fmt(r.F1/r.F2,2) : "", fmt(r.r1/r.r2,2), fmt(r.r2/r.r1,2)]) : c;
+}
+function drawPairs(){
+  const t = document.getElementById("pairtbl");
+  if (!S.pairs.length){ t.innerHTML = '<tbody><tr><td style="color:var(--text-2)">No trials yet.</td></tr></tbody>'; return; }
+  let h = "<thead><tr>" + pairHeaders().map(function(x){ return "<th>" + x + "</th>"; }).join("") + "</tr></thead><tbody>";
+  S.pairs.forEach(function(r){ h += "<tr>" + pairCells(r).map(function(c){ return "<td>" + c + "</td>"; }).join("") + "</tr>"; });
+  t.innerHTML = h + "</tbody>";
+}
+function setRatios(on){
+  S.ratios = on;
+  const b = document.getElementById("pairratios");
+  b.setAttribute("aria-pressed", String(on));
+  b.textContent = on ? "Hide ratios" : "Show ratios (part d)";
+  drawPairs();
+}
+function recordPair(){
+  const msg = document.getElementById("pairmsg");
+  const f1 = S.meters.find(function(x){ return x.label === "F1"; });
+  const f2 = S.meters.find(function(x){ return x.label === "F2"; });
+  if (!f1 || !f2){ msg.textContent = "Press Set up part c first, so the bar has scales F1 and F2."; return false; }
+  if (f1.hole === 0 || f2.hole === 0){ msg.textContent = "Hook each scale into a hole away from the axle."; return false; }
+  if (!isBalanced()){ msg.textContent = "The bar still turns. Change F2's force until it doesn't, then record."; return false; }
+  S.pairs.push({trial: S.pairs.length + 1, F1: f1.F, r1: leverArm(f1), F2: f2.F, r2: leverArm(f2)});
+  drawPairs();
+  msg.textContent = "Recorded trial " + S.pairs.length + ".";
+  return true;
+}
+function pairCSV(){
+  return [pairHeaders().join(",")].concat(S.pairs.map(function(r){ return pairCells(r).join(","); })).join("\n");
+}
+document.getElementById("pairrec").addEventListener("click", recordPair);
+document.getElementById("pairratios").addEventListener("click", function(){ setRatios(!S.ratios); });
+document.getElementById("pairclear").addEventListener("click", function(){
+  S.pairs = []; drawPairs();
+  document.getElementById("paircsv").style.display = "none";
+  document.getElementById("pairmsg").textContent = "";
+});
+document.getElementById("paircopy").addEventListener("click", function(){
+  const msg = document.getElementById("pairmsg"), box = document.getElementById("paircsv");
+  if (!S.pairs.length){ msg.textContent = "Record a trial first."; return; }
+  const text = pairCSV(); box.value = text;
+  function fallback(){ box.style.display = "block"; box.focus(); box.select(); msg.textContent = "Select the text above and copy it (Ctrl+C or ⌘C)."; }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ box.style.display = "none"; msg.textContent = "Copied " + S.pairs.length + " trials. Paste into a spreadsheet."; }, fallback);
+    } else fallback();
+  } catch(e){ fallback(); }
+});
+drawPairs();
+
+/* ------------------------------------------------------------------ boot */
+
+S.meters = [scaleAt(S.N, 2, 60, "F1")];      // opens near part a of Activity 12.5.2, pulling at an angle to the bar
+S.tilt = targetTilt();
+setMode("measure");
+showPart("a");
+
+/* test hook for automated checks; harmless in the page */
+window.__torque = {S:S, tau:tau, netTau:netTau, isBalanced:isBalanced, mkScale:mkScale, mkMass:mkMass, thetaOf:thetaOf, forceOf:forceOf, render:render, setMode:setMode, csvText:csvText, recordSetup:recordSetup, letGo:letGo, stopSpin:stopSpin, spinState:spinState, barInertia:barInertia, showPart:showPart, recordPair:recordPair, setRatios:setRatios, pairCSV:pairCSV, ACT:ACT};
+</script>
+</body>
+</html>
